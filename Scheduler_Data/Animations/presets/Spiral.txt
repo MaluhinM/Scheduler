@@ -1,0 +1,105 @@
+{
+ 'width': 300,
+ 'height': 300,
+ 'delay': 30,
+ 'animation': [
+    # ===== Фаза 1: Спиральное появление (20 кадров) =====
+    *[
+        [
+            # Вращающиеся круги (спиральный вылет)
+            *[
+                (
+                    'oval', 
+                    [
+                        150 + (frame * 4.5) * cos(2 * pi * (i/12 + frame/60)) - 5 - 3 * sin(2 * pi * frame/10),
+                        150 + (frame * 4.5) * sin(2 * pi * (i/12 + frame/60)) - 5 - 3 * sin(2 * pi * frame/10),
+                        150 + (frame * 4.5) * cos(2 * pi * (i/12 + frame/60)) + 5 + 3 * sin(2 * pi * frame/10),
+                        150 + (frame * 4.5) * sin(2 * pi * (i/12 + frame/60)) + 5 + 3 * sin(2 * pi * frame/10)
+                    ],
+                    {
+                        'fill': ['#7DA6FF', '#6DC983', '#FFD04A', '#FF7B6D'][i % 4],
+                        'outline': ''
+                    }
+                )
+                for i in range(12)
+            ],
+            
+            # Пульсирующий центральный круг
+            ('oval', [
+                140 - 5 * sin(2 * pi * frame/15),
+                140 - 5 * sin(2 * pi * frame/15),
+                160 + 5 * sin(2 * pi * frame/15),
+                160 + 5 * sin(2 * pi * frame/15)
+            ], {
+                'fill': '#FFFFFF',
+                'outline': ''
+            })
+        ]
+        for frame in range(20)
+    ],
+    
+    # ===== Фаза 2: Основное вращение (40 кадров) =====
+    *[
+        [
+            *[
+                (
+                    'oval', 
+                    [
+                        150 + 90 * cos(2 * pi * (i/12 + frame/48)) - 6 - 4 * sin(2 * pi * (frame/10 + i/12)),
+                        150 + 90 * sin(2 * pi * (i/12 + frame/48)) - 6 - 4 * sin(2 * pi * (frame/10 + i/12)),
+                        150 + 90 * cos(2 * pi * (i/12 + frame/48)) + 6 + 4 * sin(2 * pi * (frame/10 + i/12)),
+                        150 + 90 * sin(2 * pi * (i/12 + frame/48)) + 6 + 4 * sin(2 * pi * (frame/10 + i/12))
+                    ],
+                    {
+                        'fill': ['#7DA6FF', '#6DC983', '#FFD04A', '#FF7B6D'][i % 4],
+                        'outline': ''
+                    }
+                )
+                for i in range(12)
+            ],
+            ('oval', [
+                140 - 5 * sin(2 * pi * (frame+20)/15),
+                140 - 5 * sin(2 * pi * (frame+20)/15),
+                160 + 5 * sin(2 * pi * (frame+20)/15),
+                160 + 5 * sin(2 * pi * (frame+20)/15)
+            ], {
+                'fill': '#FFFFFF',
+                'outline': ''
+            })
+        ]
+        for frame in range(40)
+    ],
+    
+    # ===== Фаза 3: Спиральное схлопывание (20 кадров) =====
+    *[
+        [
+            *[
+                (
+                    'oval', 
+                    [
+                        150 + (90 - frame * 4.5) * cos(2 * pi * (i/12 + (40+frame)/60)) - 5 + 3 * sin(2 * pi * frame/10),
+                        150 + (90 - frame * 4.5) * sin(2 * pi * (i/12 + (40+frame)/60)) - 5 + 3 * sin(2 * pi * frame/10),
+                        150 + (90 - frame * 4.5) * cos(2 * pi * (i/12 + (40+frame)/60)) + 5 - 3 * sin(2 * pi * frame/10),
+                        150 + (90 - frame * 4.5) * sin(2 * pi * (i/12 + (40+frame)/60)) + 5 - 3 * sin(2 * pi * frame/10)
+                    ],
+                    {
+                        'fill': ['#FFD04A', '#FF7B6D', '#7DA6FF', '#6DC983'][i % 4],
+                        'outline': ''
+                    }
+                )
+                for i in range(12)
+            ],
+            ('oval', [
+                140 - 5 * sin(2 * pi * (frame+60)/15),
+                140 - 5 * sin(2 * pi * (frame+60)/15),
+                160 + 5 * sin(2 * pi * (frame+60)/15),
+                160 + 5 * sin(2 * pi * (frame+60)/15)
+            ], {
+                'fill': '#FFFFFF',
+                'outline': ''
+            })
+        ]
+        for frame in range(20)
+    ]
+ ]
+}

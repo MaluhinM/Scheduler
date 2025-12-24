@@ -1,0 +1,52 @@
+class LoadingAnimation:
+    def __init__(self, master, filename, bg, pady=10):
+        self.master = master
+        instruction = eval(open(filename, 'r', encoding='utf-8').read())
+        self.instruction = instruction
+        self.pady = pady
+
+        self.N = 0
+        self.LIMIT = len(instruction['animation'])
+        self.DELAY = instruction['delay']
+        self.frame = tk.Frame(master, bg=bg)
+        self.canvas = tk.Canvas(self.frame, width=instruction['width'], height=instruction['height'], bg=bg, highlightthickness=0)
+        self.canvas.pack(pady=pady)
+
+        self.update = self.draw().__next__
+
+
+    def draw(self):
+        while True:
+            anim = self.instruction['animation'][self.N]
+            for i in anim:
+                t, a, kw = i
+                self.__handler__(t, a, kw)
+            self.master.update_idletasks()
+            if self.WORKING:
+                self.master.after(self.DELAY, self.update)
+            yield
+            self.N = (self.N + 1) % self.LIMIT
+            self.canvas.delete('all')
+
+    def start(self):
+        self.WORKING = True
+        self.frame.pack(pady=self.pady)
+        self.master.update()
+        self.master.after(0, self.update)
+
+    def stop(self):
+        self.WORKING = False
+        self.frame.pack_forget()
+
+    def __handler__(self, t, a, kw):
+        match t:
+            case 'oval':
+                self.canvas.create_oval(*a, **kw)
+            case 'rectangle':
+                self.canvas.create_rectangle(*a, **kw)
+            case 'arc':
+                self.canvas.create_arc(*a, **kw)
+            case 'text':
+                self.canvas.create_text(*a, **kw)
+            case _:
+                print(f'Warning: There is no case \'{t}\' in __handler__ function')

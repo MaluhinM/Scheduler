@@ -1,0 +1,1 @@
+{'current_schedule': '11А-2', 'animation_quality': 1.0, 'root_resizable': True, 'set_in_sleep': True, 'ceil_time': False, 'offset': {'seconds': 0, 'minutes': 0, 'hours': 0}, 'use_time_server': False, 'time_server': 'pool.ntp.org', 'time_sync_interval': 300, 'font': 'Century Gothic', 'fontsize': 'Normal', 'theme': 'Darker', 'animation': ['GIFPlayer', 'winload']}

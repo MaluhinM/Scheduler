@@ -1,0 +1,13 @@
+{
+  'next.png': self.Colors['root_label'],
+  'back.png': self.Colors['root_label'],
+  'loading.png': self.Colors['title1'],
+  'add.png': self.Colors['title1'],
+  'menu.png': self.Colors['title1'],
+  'checkbox_blank.png': self.Colors['title1'],
+  'checkbox_fill.png': self.Colors['title1'],
+  'warning.png': self.Colors['warning'],
+  'check.png': self.Colors['color1a'],
+  'broken.png': self.Colors['color3a'],
+  'close.png': self.Colors['color4a'],
+}

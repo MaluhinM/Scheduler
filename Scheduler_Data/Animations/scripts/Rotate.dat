@@ -1,0 +1,44 @@
+class LoadingAnimation:
+    def __init__(self, master, filename, bg, title=None, delay=15, rotation=10, pady=10):
+        self.master = master
+        self.filename = filename
+        width, height = Image.open(filename).size
+        self.canvas_width, self.canvas_height = width // 2, height // 2
+        self.delay = delay
+        self.rotation = rotation
+        self.pady = pady
+        self.frame = tk.Frame(master, bg=bg)
+        self.canvas = tk.Canvas(self.frame, width=width, height=height, bg=bg, highlightthickness=0)
+        self.canvas.pack(pady=pady)
+        if title:
+            text = title['text']
+            font = title['font']
+            fg = title['fg']
+            self.title = tk.Label(self.frame, text=text, font=font, fg=fg, bg=bg)
+            self.title.pack(pady=pady)
+
+        self.update = self.draw().__next__
+
+    def draw(self):
+        image = Image.open(self.filename)
+        while True:
+            tkimage = ImageTk.PhotoImage(image.rotate(-self.angle))
+            canvas_obj = self.canvas.create_image(self.canvas_width, self.canvas_height, image=tkimage)
+            self.master.update_idletasks()
+            if self.WORKING:
+                self.master.after(self.delay, self.update)
+            yield
+            self.canvas.delete(canvas_obj)
+            self.angle += self.rotation
+            self.angle %= 360
+
+    def start(self):
+        self.WORKING = True
+        self.angle = 0
+        self.frame.pack(pady=self.pady)
+        self.master.update()
+        self.master.after(0, self.update)
+
+    def stop(self):
+        self.WORKING = False
+        self.frame.pack_forget()

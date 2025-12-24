@@ -1,0 +1,41 @@
+{
+    'TCombobox': {
+        'configure': {
+            'selectbackground': self.Colors['extra'],
+            'fieldbackground': self.Colors['extra'],
+            'background': self.Colors['title1'],
+            'foreground': self.Colors['title1']
+        }
+    },
+    'Vertical.TScrollbar': {
+        'configure': {
+            'background': self.Colors['lesson_frame2'],
+            'troughcolor': self.Colors['lessons_frame_bg'],
+            'gripcount': 5,
+            'bordercolor': self.Colors['lesson_number_fg'],
+            'darkcolor': self.Colors['shade1'],
+            'lightcolor': self.Colors['lesson_frame1'],
+            'arrowcolor': self.Colors['title2']
+        }
+    },
+    'Horizontal.TScrollbar': {
+        'configure': {
+            'background': self.Colors['lesson_frame2'],
+            'troughcolor': self.Colors['lessons_frame_bg'],
+            'gripcount': 5,
+            'bordercolor': self.Colors['lesson_number_fg'],
+            'darkcolor': self.Colors['shade1'],
+            'lightcolor': self.Colors['lesson_frame1'],
+            'arrowcolor': self.Colors['title2']
+        }
+    },
+    'Horizontal.TProgressbar': {
+        'configure': {
+            'background': self.Colors['lesson_frame2'],
+            'troughcolor': self.Colors['lessons_frame_bg'],
+            'bordercolor': self.Colors['lesson_number_fg'],
+            'darkcolor': self.Colors['shade1'],
+            'lightcolor': self.Colors['lesson_frame1'],
+        }
+    }
+}

@@ -1,0 +1,70 @@
+class LoadingAnimation:
+    def __init__(self, master, filename, bg, delay=30, pady=10):
+        self.master = master
+        self.gif_path = filename
+        self.bg = bg
+        self.delay = delay
+        self.pady = pady
+        self.frames = []
+        self.delays = []
+        self.load_gif()
+
+    def load_gif(self):
+        try:
+            with Image.open(self.gif_path) as im:
+                if not hasattr(im, 'is_animated') or not im.is_animated:
+                    frame = self.process_frame(im)
+                    self.frames.append(frame)
+                    self.delays.append(self.delay)  # Добавляем задержку для статического кадра
+                    return
+
+                for frame in ImageSequence.Iterator(im):
+                    processed_frame = self.process_frame(frame)
+                    self.frames.append(processed_frame)
+
+                    try:
+                        self.delays.append(frame.info['duration'])
+                    except KeyError:
+                        self.delays.append(self.delay)  # Исправлено: self.delay вместо delay
+
+        except Exception as e:
+            print(f"Error loading GIF: {e}")
+            empty_image = Image.new('RGBA', (100, 100), (0, 0, 0, 0))
+            photo = self.process_frame(empty_image)
+            self.frames.append(photo)
+            self.delays.append(100)
+
+    def process_frame(self, frame):
+        frame = frame.convert('RGBA')
+        bg_image = Image.new('RGBA', frame.size, self.bg)
+        bg_image.paste(frame, (0, 0), frame)
+        return ImageTk.PhotoImage(bg_image)
+
+    def update_frame(self):
+        if not self.WORKING:
+            return
+        if self.frames:
+            # Показываем текущий кадр
+            self.label.config(image=self.frames[self.current_frame])
+            # Получаем задержку для текущего кадра
+            current_delay = self.delays[self.current_frame]
+            # Обновляем номер кадра
+            self.current_frame = (self.current_frame + 1) % len(self.frames)
+            # Планируем следующее обновление с задержкой текущего кадра
+            self.master.after(current_delay, self.update_frame)
+        else:
+            print('GIF не загружен или пуст.')
+
+    def start(self):
+        self.WORKING = True
+        self.label = tk.Label(self.master, borderwidth=0)
+        self.label.pack(pady=self.pady)
+        self.current_frame = 0
+        self.update_frame()
+
+    def stop(self):
+        self.WORKING = False
+        try:
+            self.label.destroy()
+        except tk.TclError:
+            pass

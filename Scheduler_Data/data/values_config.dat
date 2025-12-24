@@ -1,0 +1,1 @@
+{'animation_kwargs': {'delay': 'int(x/self.Scheduler_data["animation_quality"])', 'in_steps': 'int(x*self.Scheduler_data["animation_quality"])', 'out_steps': 'int(x*self.Scheduler_data["animation_quality"])'}}

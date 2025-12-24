@@ -1,0 +1,25 @@
+class LoadingAnimation:
+    def __init__(self, master, bg, interval=50, maximum=100, length=None, title=None, padx=20, pady=10):
+        self.master = master
+        self.interval = interval
+        self.pady = pady
+        self.frame = tk.Frame(master, bg=bg)
+        self.progressbar = ttk.Progressbar(self.frame, mode='indeterminate', maximum=maximum, length=length)
+        self.progressbar.pack(fill='x', padx=padx)
+        if title:
+            text = title['text']
+            font = title['font']
+            fg = title['fg']
+            self.title = tk.Label(self.frame, text=text, font=font, fg=fg, bg=bg)
+            self.title.pack(pady=pady)
+
+    def start(self):
+        self.WORKING = True
+        self.frame.pack(pady=self.pady, fill='x')
+        self.progressbar.start(self.interval)
+        self.master.update()
+
+    def stop(self):
+        self.WORKING = False
+        self.progressbar.stop()
+        self.frame.pack_forget()

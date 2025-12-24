@@ -1,0 +1,33 @@
+{
+ 'width': 400,
+ 'height': 400,
+ 'delay': 30,
+ 'animation': [
+    *[
+        [
+            *[
+                (
+                    'oval', 
+                    [
+                        200 + r * cos(2*pi*(i/12 + frame/120 + r/200)),
+                        200 + r * sin(2*pi*(i/12 + frame/120 + r/200)),
+                        200 + r * cos(2*pi*(i/12 + frame/120 + r/200)) + 8,
+                        200 + r * sin(2*pi*(i/12 + frame/120 + r/200)) + 8
+                    ],
+                    {
+                        'fill': f'#{int(255*(r/150)):02x}{int(255*(1-r/150)):02x}ff',
+                        'outline': ''
+                    }
+                )
+                for i in range(12)
+                for r in range(20, 150, 15)
+            ],
+            ('oval', [196, 196, 212, 212], {
+                'fill': '#00ffff',
+                'outline': '#005577'
+            })
+        ]
+        for frame in range(120)
+    ]
+ ]
+}
