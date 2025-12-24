@@ -1,0 +1,1 @@
+{'huge_title': 24, 'larger_title': 20, 'large_title': 20, 'bigger_title': 18, 'big_title': 18, 'bigger_normal_title': 16, 'normal_title': 16, 'small_title': 14, 'smaller_title': 12, 'text': 12}
