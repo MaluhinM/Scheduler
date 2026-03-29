@@ -1,11 +1,15 @@
-# Scheduler - программа для управления расписанием уроков.
-# Copyright (C) 2025 Малухин Мирон
-#
-# Это программное обеспечение распространяется под лицензией MIT.
-# Подробнее см. в файле LICENSE.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Scheduler - приложение для управления школьным расписанием.
+"""
+
+from metadata import *
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, colorchooser
+from tkmd import MarkdownText, FontCache
 
 from PIL import Image, ImageTk, ImageSequence, ImageFont, ImageDraw
 import imageio
@@ -23,6 +27,7 @@ from glob import \
     glob as shitty_glob  # glob.glob() is shitty so I wrote my own glob() using glob.glob() lol 💀 (I'm dumb)
 import ctypes
 from pathvalidate import sanitize_filename
+import zipfile
 
 from tkcalendar import Calendar
 import datetime
@@ -37,13 +42,9 @@ if sys.platform == 'win32':
     import winreg
 
 
-__version__ = '2025.12.24'
-__author__ = 'Malukhin Miron'
-
-
 class Scheduler:
-    WEEKNAMES = ('Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресение')
-    WEEKNAMES2 = ('понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу', 'воскресение')
+    WEEKNAMES = ('Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье')
+    WEEKNAMES2 = ('понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу', 'воскресенье')
     WEEKNAMES3 = ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс')
     MONTHNAMES = ('Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь',
                   'Октябрь', 'Ноябрь', 'Декабрь')
@@ -79,9 +80,12 @@ class Scheduler:
                 fa.set_file_association('.scheduler-data', 'Scheduler', sys.argv[0],
                                         'Файл установки компонентов Scheduler')
 
-        self.Scheduler_data = eval(open('Scheduler_Data/data/Scheduler_data.dat', 'r', encoding='utf-8').read())
-        self.Values = eval(open('Scheduler_Data/data/default_values.dat', 'r', encoding='utf-8').read())
-        values_config = eval(open('Scheduler_Data/data/values_config.dat', 'r', encoding='utf-8').read())
+        with open('Scheduler_Data/data/Scheduler_data.dat', 'r', encoding='utf-8') as f:
+            self.Scheduler_data = eval(f.read())
+        with open('Scheduler_Data/data/default_values.dat', 'r', encoding='utf-8') as f:
+            self.Values = eval(f.read())
+        with open('Scheduler_Data/data/values_config.dat', 'r', encoding='utf-8') as f:
+            values_config = eval(f.read())
         self.Values = configure_values(self.Values)
 
         self.offset = self.Scheduler_data['offset']
@@ -90,11 +94,6 @@ class Scheduler:
             if response is False:
                 return
         self.CURRENT_THEME = self.Scheduler_data['theme']
-        # shutil.copy(f'Scheduler_Data/Fonts/{self.Scheduler_data["font"]}/{self.Scheduler_data["font"]}.dat',
-        #             f'Scheduler_Data/data/fonts.dat')
-        # shutil.copy(f'Scheduler_Data/FontSizes/{self.Scheduler_data["fontsize"]}.txt',
-        #             f'Scheduler_Data/data/fontsize.dat')
-        # shutil.copy(f'Scheduler_Data/Themes/{self.CURRENT_THEME}.txt', f'Scheduler_Data/data/colors.dat')
         self.update_colors()
 
         resizable = self.Scheduler_data['root_resizable'], self.Scheduler_data['root_resizable']
@@ -119,7 +118,8 @@ class Scheduler:
                 continue
             if result[0] is True:
                 self.Scheduler_data['current_schedule'] = result[1]
-                open('Scheduler_Data/data/Scheduler_data.dat', 'w', encoding='utf-8').write(str(self.Scheduler_data))
+                with open('Scheduler_Data/data/Scheduler_data.dat', 'w', encoding='utf-8') as f:
+                    f.write(str(self.Scheduler_data))
                 self.root.mainloop()
                 return
             break
@@ -153,14 +153,14 @@ class Scheduler:
         def check_scrollable():
             if self.subjects_length == 0:
                 return None
-            if self.scheduleframe.winfo_height() > self.canvas.winfo_height():
-                self.scrollbar.configure(command=self.canvas.yview)
-                self.root.bind('<MouseWheel>', lambda event: WindowManager.on_mousewheel(event, self.canvas))
-                self.root.bind('<Up>', lambda event: self.canvas.yview_scroll(-2, 'units'))
-                self.root.bind('<Down>', lambda event: self.canvas.yview_scroll(2, 'units'))
+            if self.rootwidgets['scheduleframe'].winfo_height() > self.rootwidgets['canvas'].winfo_height():
+                self.rootwidgets['scrollbar'].configure(command=self.rootwidgets['canvas'].yview)
+                self.root.bind('<MouseWheel>', lambda event: WindowManager.on_mousewheel(event, self.rootwidgets['canvas']))
+                self.root.bind('<Up>', lambda event: self.rootwidgets['canvas'].yview_scroll(-2, 'units'))
+                self.root.bind('<Down>', lambda event: self.rootwidgets['canvas'].yview_scroll(2, 'units'))
                 return True
             else:
-                self.scrollbar.configure(command=lambda *args: None)
+                self.rootwidgets['scrollbar'].configure(command=lambda *args: None)
                 self.root.bind('<MouseWheel>', lambda event: None)
                 self.root.bind('<Up>', lambda event: None)
                 self.root.bind('<Down>', lambda event: None)
@@ -170,8 +170,8 @@ class Scheduler:
             self.root_width = self.root.winfo_width()
             self.lessonframewidth = self.root_width - self.INDENTATION
 
-            btn.configure('out', master_kwargs={'width': self.root_width})
             try:
+                btn.configure('out', master_kwargs={'width': self.root_width})
                 for i, j in self.widgets:
                     i.configure(width=self.lessonframewidth)
                     j.configure(width=self.lessonframewidth)
@@ -191,7 +191,8 @@ class Scheduler:
         def _quit(event=None):
             if self.root.state() == 'normal' and not self.root.attributes('-fullscreen'):
                 width, height = self.root.winfo_width(), self.root.winfo_height()
-                open('Scheduler_Data/data/window_size.dat', 'w', encoding='utf-8').write(f'({width}, {height})')
+                with open('Scheduler_Data/data/window_size.dat', 'w', encoding='utf-8') as f:
+                    f.write(f'({width}, {height})')
             self.root.destroy()
 
         # Все долгие операции выполняются здесь
@@ -210,7 +211,8 @@ class Scheduler:
             text = 'Завершение работы'
             img = None
         else:
-            text = eval(open('Scheduler_Data/data/welcome_text.dat', 'r', encoding='utf-8').read())
+            with open('Scheduler_Data/data/welcome_text.dat', 'r', encoding='utf-8') as f:
+                text = eval(f.read())
             text[1].append(f'Шанс увидеть эту надпись: {round(100 / (len(text) * (len(text[1]) + 1)), 2)}%')
             images = ('night', 'morning', 'day', 'evening')
             pick = randint(0, len(text) - 1)
@@ -247,7 +249,8 @@ class Scheduler:
 
         self.width, self.height = widthmax, heightmax
         self.root.minsize(widthmax, heightmax)
-        width, height = eval(open('Scheduler_Data/data/window_size.dat', 'r', encoding='utf-8').read())
+        with open('Scheduler_Data/data/window_size.dat', 'r', encoding='utf-8') as f:
+            width, height = eval(f.read())
         WindowManager.FixWindowSize(self.root, width, height)
 
         btn = CreateButton(
@@ -263,6 +266,8 @@ class Scheduler:
 
         self.new_view = False
         self.set_view(0)
+        self.rootwidgets = self.define_schedule(self.root)
+        self.widgets = []
         self.load_schedule(ShowLoadingAnimation=False, init=True)
 
         check_size()
@@ -286,6 +291,33 @@ class Scheduler:
 
         self.root.quit()
 
+    def define_schedule(self, root):
+        container = tk.Frame(root, bg=self.Colors['lessons_frame_bg'])
+        canvas = tk.Canvas(container, width=self.width, height=self.height, highlightthickness=0,
+                                bg=self.Colors['lessons_frame_bg'])
+        scrollbar = ttk.Scrollbar(container, orient='vertical')
+        scheduleframe = tk.Frame(canvas, bg=self.Colors['lessons_frame_bg'])
+
+        scheduleframe.bind(
+            '<Configure>',
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox('all')
+            )
+        )
+
+        canvas.create_window((0, 0), window=scheduleframe, anchor='nw')
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.yview_moveto(0)
+
+        widgets = {
+            'container': container,
+            'canvas': canvas,
+            'scrollbar': scrollbar,
+            'scheduleframe': scheduleframe
+        }
+
+        return widgets
+
     def integrity_check(self, master=None, showinfo=False, init=False):
         def stop(event=None):
             sys.exit(1)
@@ -298,7 +330,8 @@ class Scheduler:
 
         def check_corruption(file):
             try:
-                exec(open(file, 'r', encoding='utf-8').read(), {**globals(), 'self': self})
+                with open(file, 'r', encoding='utf-8') as f:
+                    exec(f.read(), {**globals(), 'self': self})
                 return False
             except:
                 return True
@@ -380,7 +413,8 @@ class Scheduler:
             animation_kwargs = self.Values['animation_kwargs']
 
         if os.path.exists('requirements.ini'):
-            requirements = eval(open('requirements.ini', 'r', encoding='utf-8').read())
+            with open('requirements.ini', 'r', encoding='utf-8') as f:
+                requirements = eval(f.read())
             main_requirements = requirements['main']
             additional_paths = requirements['additional']
             data_requirements = requirements['data']
@@ -442,6 +476,10 @@ class Scheduler:
         if os.path.exists('requirements.ini'):
             corrupted = {}
 
+            self.Fonts = dict()
+            for i in fonts_requirements:
+                self.Fonts[i] = None
+
             for i in glob('**', recursive=True):
                 if any(i.startswith(j) for j in ignore):
                     continue
@@ -451,7 +489,8 @@ class Scheduler:
 
             for i in glob('Scheduler_Data/Schedules/*.txt'):
                 if not check_corruption(i):
-                    data = eval(open(i, 'r', encoding='utf-8').read())
+                    with open(i, 'r', encoding='utf-8') as f:
+                        data = eval(f.read())
                     if 'subjects' not in data:
                         add_to_corrupted(i)
                         continue
@@ -498,7 +537,8 @@ class Scheduler:
 
             for i in glob('Scheduler_Data/Animations/presets/*.txt'):
                 if not check_corruption(i):
-                    data = eval(open(i, 'r', encoding='utf-8').read())
+                    with open(i, 'r', encoding='utf-8') as f:
+                        data = eval(f.read())
                     if find_corruption(data, presets_requirements):
                         add_to_corrupted(i)
 
@@ -512,7 +552,8 @@ class Scheduler:
                         missing[i] = []
                     missing[i].append(file)
                 elif not check_corruption(f'{i}/{file}'):
-                    data = eval(open(f'{i}/{file}', 'r', encoding='utf-8').read())
+                    with open(f'{i}/{file}', 'r', encoding='utf-8') as f:
+                        data = eval(f.read())
                     for key in fonts_requirements:
                         if key not in data:
                             add_to_corrupted(f'{i}/{file}')
@@ -520,7 +561,8 @@ class Scheduler:
 
             for i in glob('Scheduler_Data/FontSizes/*.txt'):
                 if not check_corruption(i):
-                    data = eval(open(i, 'r', encoding='utf-8').read())
+                    with open(i, 'r', encoding='utf-8') as f:
+                        data = eval(f.read())
                     for key in fonts_requirements:
                         if key not in data:
                             add_to_corrupted(i)
@@ -530,8 +572,10 @@ class Scheduler:
             fontsize_corrupted = check_corruption('Scheduler_Data/data/fontsize.dat')
             if 'fonts.dat' not in missing['Scheduler_Data/data'] and not fonts_corrupted and 'fontsize.dat' not in \
                     missing['Scheduler_Data/data'] and not fontsize_corrupted:
-                data1 = eval(open('Scheduler_Data/data/fonts.dat', 'r', encoding='utf-8').read())
-                data2 = eval(open('Scheduler_Data/data/fontsize.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/fonts.dat', 'r', encoding='utf-8') as f:
+                    data1 = eval(f.read())
+                with open('Scheduler_Data/data/fontsize.dat', 'r', encoding='utf-8') as f:
+                    data2 = eval(f.read())
                 for i in data1.keys():
                     if i not in data2:
                         add_to_corrupted('Scheduler_Data/data/fonts.dat')
@@ -540,7 +584,8 @@ class Scheduler:
 
             if 'images_config.dat' not in missing['Scheduler_Data/data'] and not check_corruption(
                     'Scheduler_Data/data/images_config.dat'):
-                data = eval(open('Scheduler_Data/data/images_config.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/images_config.dat', 'r', encoding='utf-8') as f:
+                    data = eval(f.read())
                 for i in data.keys():
                     if i not in missing['Scheduler_Data/images'] and not os.path.exists(f'Scheduler_Data/images/{i}'):
                         add_to_corrupted('Scheduler_Data/data/images_config.dat')
@@ -548,7 +593,8 @@ class Scheduler:
 
             if 'Scheduler_data.dat' not in missing['Scheduler_Data/data'] and not check_corruption(
                     'Scheduler_Data/data/Scheduler_data.dat'):
-                data = eval(open('Scheduler_Data/data/Scheduler_data.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/Scheduler_data.dat', 'r', encoding='utf-8') as f:
+                    data = eval(f.read())
                 if find_corruption(data, data_requirements):
                     add_to_corrupted('Scheduler_Data/data/Scheduler_data.dat')
                 else:
@@ -597,19 +643,22 @@ class Scheduler:
 
             if 'default_values.dat' not in missing['Scheduler_Data/data'] and not check_corruption(
                     'Scheduler_Data/data/default_values.dat'):
-                data = eval(open('Scheduler_Data/data/default_values.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/default_values.dat', 'r', encoding='utf-8') as f:
+                    data = eval(f.read())
                 if find_corruption(data, values_requirements):
                     add_to_corrupted('Scheduler_Data/data/default_values.dat')
 
             if 'values_config.dat' not in missing['Scheduler_Data/data'] and not check_corruption(
                     'Scheduler_Data/data/values_config.dat'):
-                data = eval(open('Scheduler_Data/data/values_config.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/values_config.dat', 'r', encoding='utf-8') as f:
+                    data = eval(f.read())
                 if find_corruption(data, values_requirements, check_type=False):
                     add_to_corrupted('Scheduler_Data/data/default_values.dat')
 
             if 'welcome_text.dat' not in missing['Scheduler_Data/data'] and not check_corruption(
                     'Scheduler_Data/data/welcome_text.dat'):
-                data = eval(open('Scheduler_Data/data/welcome_text.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/welcome_text.dat', 'r', encoding='utf-8') as f:
+                    data = eval(f.read())
                 if not isinstance(data, tuple):
                     add_to_corrupted('Scheduler_Data/data/welcome_text.dat')
                 elif len(data) != 2:
@@ -688,7 +737,8 @@ class Scheduler:
                 'Scheduler_Data/data/Scheduler_data.dat') and 'Scheduler_Data' in missing and 'Themes' not in missing[
                 'Scheduler_Data']:
                 self.update_style()
-                data = eval(open('Scheduler_Data/data/Scheduler_data.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/Scheduler_data.dat', 'r', encoding='utf-8') as f:
+                    data = eval(f.read())
                 current_theme = data['theme']
                 shutil.copy(f'Scheduler_Data/Themes/{current_theme}.txt', 'Scheduler_Data/data/colors.dat')
                 self.customStyle.theme_use(current_theme)
@@ -875,13 +925,16 @@ class Scheduler:
             self.checker.mainloop()
 
     def update_colors(self):
-        self.Colors = eval(open('Scheduler_Data/data/colors.dat', 'r', encoding='utf-8').read())
+        with open('Scheduler_Data/data/colors.dat', 'r', encoding='utf-8') as f:
+            self.Colors = eval(f.read())
 
     def update_fonts(self, master=None):
         if master is None:
             master = self.root
-        self.Fonts = eval(open('Scheduler_Data/data/fonts.dat', 'r', encoding='utf-8').read())
-        font_sizes = eval(open('Scheduler_Data/data/fontsize.dat', 'r', encoding='utf-8').read())
+        with open('Scheduler_Data/data/fonts.dat', 'r', encoding='utf-8') as f:
+            self.Fonts = eval(f.read())
+        with open('Scheduler_Data/data/fontsize.dat', 'r', encoding='utf-8') as f:
+            font_sizes = eval(f.read())
         for i, j in self.Fonts.items():
             size = font_sizes[i]
             parts = j.split('+')
@@ -907,30 +960,33 @@ class Scheduler:
             style_name = os.path.basename(i).split('.')[0]
             shutil.copy(i, 'Scheduler_Data/data/colors.dat')
             self.update_colors()
-            self.customStyle.theme_create(style_name, parent='clam',
-                                          settings=eval(open('Scheduler_Data/data/tkinterstyle.dat',
-                                                             'r', encoding='utf-8').read()))
+            with open('Scheduler_Data/data/tkinterstyle.dat', 'r', encoding='utf-8') as f:
+                self.customStyle.theme_create(style_name, parent='clam', settings=eval(f.read()))
             self.Styles.append(style_name)
 
     def update_animation(self, animation):
         match animation[0]:
             case 'Rotate':
-                exec(open('Scheduler_Data/Animations/scripts/Rotate.dat', 'r', encoding='utf-8').read(), globals())
+                with open('Scheduler_Data/Animations/scripts/Rotate.dat', 'r', encoding='utf-8') as f:
+                    exec(f.read(), globals())
                 self.RunAnimation = lambda master, filename='Scheduler_Data/images/loading.png', bg=self.Colors['extra'], pady=0: LoadingAnimation(master=master,
                                                                                              filename=filename, bg=bg,
                                                                                              pady=pady)
             case 'Progressbar':
-                exec(open('Scheduler_Data/Animations/scripts/Progressbar.dat', 'r', encoding='utf-8').read(), globals())
+                with open('Scheduler_Data/Animations/scripts/Progressbar.dat', 'r', encoding='utf-8') as f:
+                    exec(f.read(), globals())
                 self.RunAnimation = lambda master, bg=self.Colors['extra'], interval=10, maximum=None, length=None, padx=15, pady=10: LoadingAnimation(master=master, bg=bg, interval=interval,
                                                                               maximum=maximum, length=length, padx=padx,
                                                                               pady=pady)
             case 'Handle':
-                exec(open('Scheduler_Data/Animations/scripts/Handle.dat', 'r', encoding='utf-8').read(), globals())
+                with open('Scheduler_Data/Animations/scripts/Handle.dat', 'r', encoding='utf-8') as f:
+                    exec(f.read(), globals())
                 self.RunAnimation = lambda master, filename=f'Scheduler_Data/Animations/presets/{animation[1]}.txt', bg=self.Colors['extra'], pady=0: LoadingAnimation(master=master,
                                                                                              filename=filename, bg=bg,
                                                                                              pady=pady)
             case 'GIFPlayer':
-                exec(open('Scheduler_Data/Animations/scripts/GIFPlayer.dat', 'r', encoding='utf-8').read(), globals())
+                with open('Scheduler_Data/Animations/scripts/GIFPlayer.dat', 'r', encoding='utf-8') as f:
+                    exec(f.read(), globals())
                 self.RunAnimation = lambda master, filename=f'Scheduler_Data/Animations/GIFs/{animation[1]}.gif', bg=self.Colors['extra'], delay=30, pady=0: LoadingAnimation(master=master,
                                                                                                        filename=filename,
                                                                                                        bg=bg,
@@ -957,7 +1013,8 @@ class Scheduler:
             except (NTPException, gaierror):
                 self.USE_TIME_SERVER = False
                 self.Scheduler_data['use_time_server'] = False
-                open('Scheduler_Data/data/Scheduler_data.dat', 'w', encoding='utf-8').write(str(self.Scheduler_data))
+                with open('Scheduler_Data/data/Scheduler_data.dat', 'w', encoding='utf-8') as f:
+                    f.write(str(self.Scheduler_data))
                 window = self.initialize if hasattr(self, 'initialize') else self.root
                 showinfo('Ошибка сервера',
                          'Произошла ошибка при попытке подключения к серверу.\n\n'
@@ -980,22 +1037,30 @@ class Scheduler:
 
     def get_schedule(self):
         try:
-            self.schedule = eval(
-                open('Scheduler_Data/Schedules/{schedule}.txt'.format(schedule=self.Scheduler_data['current_schedule']),
-                     'r',
-                     encoding='utf-8').read())
+            with open('Scheduler_Data/Schedules/{schedule}.txt'.format(schedule=self.Scheduler_data['current_schedule']), 'r', encoding='utf-8') as f:
+                self.schedule = eval(f.read())
+            length = len(self.schedule['subjects'])
+            subjects = list(self.schedule['subjects'])
+            duration = list(self.schedule['duration'])
+            mark = list(self.schedule['mark'])
+            for i in range(length):
+                if len(subjects[i]) == 0:
+                    subjects[i] = ('Нет уроков',)
+                    duration[i] = ('0:00-23:59',)
+                    mark[i] = ('*',)
+            self.schedule['subjects'] = tuple(subjects)
+            self.schedule['duration'] = tuple(duration)
+            self.schedule['mark'] = tuple(mark)
             return self.schedule, False
         except FileNotFoundError:
             files = glob('Scheduler_Data/Schedules/*.txt')
             if files:
                 old_schedule = self.Scheduler_data['current_schedule']
-                self.Scheduler_data['current_schedule'] = files[0].replace('Scheduler_Data/Schedules/',
-                                                                           '').removesuffix('.txt')
-                open('Scheduler_Data/data/Scheduler_data.dat', 'w', encoding='utf-8').write(str(self.Scheduler_data))
-                self.schedule = eval(
-                    open('Scheduler_Data/Schedules/{schedule}.txt'.format(
-                        schedule=self.Scheduler_data['current_schedule']), 'r',
-                         encoding='utf-8').read())
+                self.Scheduler_data['current_schedule'] = files[0].removeprefix('Scheduler_Data/Schedules/').removesuffix('.txt')
+                with open('Scheduler_Data/data/Scheduler_data.dat', 'w', encoding='utf-8') as f:
+                    f.write(str(self.Scheduler_data))
+                with open('Scheduler_Data/Schedules/{schedule}.txt'.format(schedule=self.Scheduler_data['current_schedule']), 'r', encoding='utf-8') as f:
+                    self.schedule = eval(f.read())
                 showinfo('Внимание',
                          'Указанное расписание \'{old_schedule}\' не найдено, поэтому\n'
                          'будет использоваться другое: \'{new_schedule}\''.format(
@@ -1060,12 +1125,14 @@ class Scheduler:
         canvas.create_text(self.lessonframewidth - 14, frameheight - 20, text=info,
                            font=self.Fonts['smaller_title'], fill=title3, anchor='e', justify='right')
 
-    def load_schedule(self, ShowLoadingAnimation=True, init=False, root=None):
+    def load_schedule(self, ShowLoadingAnimation=True, init=False, root=None, rootwidgets=None):
         if root is None:
             root = self.root
             FULLLOAD = True
         else:
             FULLLOAD = False
+        if rootwidgets is None:
+            rootwidgets = self.rootwidgets
 
         if FULLLOAD:
             self.root.bind('<MouseWheel>', lambda event: None)
@@ -1074,13 +1141,6 @@ class Scheduler:
 
         self.all_subjects_length = len(self.schedule['subjects'])
         self.get_time(init=init)
-
-        if hasattr(self, 'scheduleframe'):
-            self.scheduleframe.destroy()
-            del self.scheduleframe
-        if hasattr(self, 'container'):
-            self.container.destroy()
-            del self.container
 
         if FULLLOAD:
             def _changeView(event):
@@ -1169,44 +1229,19 @@ class Scheduler:
 
             FadeEffect(self.dateframe, self.Colors['shade2'], child=(label1, label2), **self.Values['animation_kwargs'])
 
+        rootwidgets['container'].pack(fill='both', expand=True)
+        rootwidgets['canvas'].pack(side='left', fill='both', expand=True)
+        rootwidgets['scrollbar'].pack(side='right', fill='y')
+
+        for i in self.widgets:
+            i[0].destroy()
         self.widgets = []
-
-        if self.subjects_length == 0:
-            self.scheduleframe = tk.Frame(root, bg=self.Colors['lessons_frame_bg'])
-            self.scheduleframe.pack(fill='both', expand=True)
-            tk.Label(self.scheduleframe, text='Нет уроков', font=self.Fonts['large_title'],
-                     bg=self.Colors['lessons_frame_bg'], fg=self.Colors['title2']).pack(pady=10, anchor='center',
-                                                                                        fill='both', expand=True)
-        else:
-            self.container = tk.Frame(root, bg=self.Colors['lessons_frame_bg'])
-            self.canvas = tk.Canvas(self.container, width=self.width, height=self.height, highlightthickness=0,
-                                    bg=self.Colors['lessons_frame_bg'])
-            self.scrollbar = ttk.Scrollbar(self.container, orient='vertical')
-            self.scheduleframe = tk.Frame(self.canvas, bg=self.Colors['lessons_frame_bg'])
-
-            self.scheduleframe.bind(
-                '<Configure>',
-                lambda e: self.canvas.configure(
-                    scrollregion=self.canvas.bbox('all')
-                )
-            )
-
-            self.canvas.create_window((0, 0), window=self.scheduleframe, anchor='nw')
-            self.canvas.configure(yscrollcommand=self.scrollbar.set)
-            self.canvas.yview_moveto(0)
-
-            self.container.pack(fill='both', expand=True)
-            self.canvas.pack(side='left', fill='both', expand=True)
-            self.scrollbar.pack(side='right', fill='y')
-
         self.lessonslist = {}
         for i, j in enumerate(self.subjects):
-            if i >= 9:
-                break
             lesson = j
             nl = self.SCHEDULE_FONT_LINESPACE * lesson.count('\n')
-            lessonframe = tk.Frame(self.scheduleframe, bg=self.Colors['lessons_frame_bg'], width=self.lessonframewidth,
-                                   height=self.lessonframeheight + nl * 2)
+            lessonframe = tk.Frame(rootwidgets['scheduleframe'], bg=self.Colors['lessons_frame_bg'],
+                                   width=self.lessonframewidth, height=self.lessonframeheight + nl * 2)
             lessonframe.i = i
             lessonframe.lesson = lesson
             lessonframe.nl = nl
@@ -1215,7 +1250,7 @@ class Scheduler:
             self.lessonslist[number] = lessonframe
             canvas = tk.Canvas(lessonframe, bg=self.Colors['lessons_frame_bg'], width=self.lessonframewidth,
                                height=self.lessonframeheight + nl * 2, highlightthickness=0)
-            if FULLLOAD:
+            if FULLLOAD and not (lesson == 'Нет уроков' and self.duration[i] == '0:00 - 23:59' and self.mark[i] == '*'):
                 canvas.bind('<Button-1>', lambda event, num=number: self.view_lesson_info(event, root, num))
             canvas.pack(fill='both', expand=True)
             self.create_schedule_item(lessonframe, canvas, '')
@@ -1324,59 +1359,52 @@ class Scheduler:
 
         infoframe = tk.Frame(viewer, bg=self.Colors['main'])
         infoframe.pack(padx=10, pady=10, anchor='nw')
-        tk.Label(infoframe,
-                 text=f'Название: {frame.lesson}', font=self.Fonts['big_title'],
-                 bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-        tk.Label(infoframe,
-                 text=f'Количество уроков в неделе: {amount_in_week}', font=self.Fonts['big_title'],
-                 bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-        tk.Label(infoframe,
-                 text=f'Текущее положение в неделе: {current_position_in_week} / {amount_in_week}',
-                 font=self.Fonts['big_title'],
-                 bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-        tk.Label(infoframe, bg=self.Colors['main']).pack(anchor='nw')
-        tk.Label(infoframe,
-                 text=f'Урок встречается в: {', '.join(where_in_week)}', font=self.Fonts['big_title'],
-                 bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-        tk.Label(infoframe,
-                 text=f'Наиболее часто урок встречается в: {', '.join(most_in_week)} (по {maxnum_counter} {declination(maxnum_counter, ('разу', 'раза', 'раз'))})',
-                 font=self.Fonts['big_title'],
-                 bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-        tk.Label(infoframe,
-                 text=f'Урок встречается {', '.join(where_in_day)} {'уроком' if len(where_in_day) == 1 else 'уроками'}',
-                 font=self.Fonts['big_title'],
-                 bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-        tk.Label(infoframe,
-                 text=f'Наиболее часто урок встречается {', '.join(most_in_day)} {'уроком' if len(most_in_day) == 1 else 'уроками'} (по {most_in_day_max} {declination(most_in_day_max, ('разу', 'раза', 'раз'))})',
-                 font=self.Fonts['big_title'],
-                 bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
+
+        font1 = self.Fonts['small_title']
+        font2 = self.Fonts['normal_title']
+        family = font1['family']
+        color1 = self.Colors['title3']
+        color2 = self.Colors['title2']
+        size1 = font1['size']
+        size2 = font2['size']
+
+        def create_info(text):
+            MarkdownText(
+                infoframe,
+                text,
+                font_family=family,
+                bg=self.Colors['main'],
+                defaults={'color': color1, 'size': size1}
+            ).pack(anchor='nw')
+
+        create_info(f"Название: <color='{color2}'><size={size2}><b>{frame.lesson}")
+        create_info(f"Количество уроков в неделе: <color='{color2}'><size={size2}><b>{amount_in_week}")
+        create_info(f"Текущее положение в неделе: <color='{color2}'><size={size2}><b>{current_position_in_week}</b></color>/<color='{color2}'><b>{amount_in_week}")
 
         tk.Label(infoframe, bg=self.Colors['main']).pack(anchor='nw')
+        create_info(f"Урок встречается в: <color='{color2}'><size={size2}><b>{', '.join(where_in_week)}")
+        create_info(f"Наиболее часто урок встречается в: <color='{color2}'><size={size2}><b>{', '.join(most_in_week)}</b></size></color>(по<color='{color2}'><b>{maxnum_counter}</b></color>{declination(maxnum_counter, ('разу', 'раза', 'раз'))})")
+        create_info(f"Урок встречается <color='{color2}'><size={size2}><b>{', '.join(where_in_day)}</b></size></color>{'уроком' if len(where_in_day) == 1 else 'уроками'}")
+        create_info(f"Наиболее часто урок встречается <color='{color2}'><size={size2}><b>{', '.join(most_in_day)}</b></size></color>{'уроком' if len(most_in_day) == 1 else 'уроками'} (по<color='{color2}'><b>{most_in_day_max}</b></color>{declination(most_in_day_max, ('разу', 'раза', 'раз'))})")
+
+        separator_frame = tk.Label(infoframe, bg=self.Colors['main'])
+        separator_frame.pack(fill='both', expand=True)
+        separator = tk.Frame(separator_frame, bg=self.Colors['main'], height=2, highlightthickness=2, highlightbackground=self.Colors['title2'])
+        separator.pack(padx=20, pady=30, fill='both', expand=True)
         if mark_amount_in_week == 0:
-            tk.Label(infoframe,
-                     text=f'Уроков с отметкой нет', font=self.Fonts['big_title'],
-                     bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
+            MarkdownText(
+                separator_frame,
+                f"Уроков с отметкой<color='{color2}'><b>нет",
+                font_family=family,
+                bg=self.Colors['main'],
+                defaults={'color': color1, 'size': size1}
+            ).place(relx=0.5, rely=0.4, anchor='center')
         else:
-            tk.Label(infoframe,
-                     text=f'Количество уроков с отметкой: {mark_amount_in_week}',
-                     font=self.Fonts['big_title'],
-                     bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-            tk.Label(infoframe,
-                     text=f'Отметки встречается в: {', '.join(mark_where_in_week)}',
-                     font=self.Fonts['big_title'],
-                     bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-            tk.Label(infoframe,
-                     text=f'Наиболее часто отметки встречается в: {', '.join(mark_most_in_week)} (по {mark_maxnum_counter} {declination(mark_maxnum_counter, ('разу', 'раза', 'раз'))})',
-                     font=self.Fonts['big_title'],
-                     bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-            tk.Label(infoframe,
-                     text=f'Отметки встречаются {', '.join(mark_where_in_day)} {'уроком' if len(mark_where_in_day) == 1 else 'уроками'}',
-                     font=self.Fonts['big_title'],
-                     bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
-            tk.Label(infoframe,
-                     text=f'Наиболее часто отметки встречаются {', '.join(mark_most_in_day)} {'уроком' if len(mark_most_in_day) == 1 else 'уроками'} (по {mark_most_in_day_max} {declination(mark_most_in_day_max, ('разу', 'раза', 'раз'))})',
-                     font=self.Fonts['big_title'],
-                     bg=self.Colors['main'], fg=self.Colors['title2']).pack(anchor='nw')
+            create_info(f"Количество уроков с отметкой: <color='{color2}'><size={size2}><b>{mark_amount_in_week}")
+            create_info(f"Отметки встречается в: <color='{color2}'><size={size2}><b>{', '.join(mark_where_in_week)}")
+            create_info(f"Наиболее часто отметки встречается в: <color='{color2}'><size={size2}><b>{', '.join(mark_most_in_week)}</b></size></color>(по<color='{color2}'><b>{mark_maxnum_counter}</b></color>{declination(mark_maxnum_counter, ('разу', 'раза', 'раз'))})")
+            create_info(f"Отметки встречаются<color='{color2}'><size={size2}><b>{', '.join(mark_where_in_day)}</b></size></color>{'уроком' if len(mark_where_in_day) == 1 else 'уроками'}")
+            create_info(f"Наиболее часто отметки встречаются<color='{color2}'><size={size2}><b>{', '.join(mark_most_in_day)}</b></size></color>{'уроком' if len(mark_most_in_day) == 1 else 'уроками'} (по<color='{color2}'><b>{mark_most_in_day_max}</b></color>{declination(mark_most_in_day_max, ('разу', 'раза', 'раз'))})")
 
         viewer.update_idletasks()
         CreateButton(
@@ -1539,8 +1567,8 @@ class Scheduler:
 
         try:
             self.root.update_idletasks()
-            self.width, self.height = self.scheduleframe.winfo_width(), self.scheduleframe.winfo_height()
-            self.canvas.configure(width=self.width, height=self.height)
+            self.width, self.height = self.rootwidgets['scheduleframe'].winfo_width(), self.rootwidgets['scheduleframe'].winfo_height()
+            self.rootwidgets['canvas'].configure(width=self.width, height=self.height)
         except (tk.TclError, AttributeError):
             pass
 
@@ -1641,12 +1669,13 @@ class Scheduler:
 
         win = WindowManager.CreateWindow(master, 'Scheduler - Сборка рюкзака', bg, switch_fullscreen=False)
 
+        subjects = [i if i != ('Нет уроков',) else [] for i in self.schedule['subjects']]
         for i in range(self.now.weekday(), self.now.weekday() - 7, -1):
-            if self.schedule['subjects'][i]:
+            if subjects[i]:
                 break
         self.viewfrom = self.now.date() - datetime.timedelta(days=self.now.weekday() - i)
         for i in range(self.now.weekday() + 1, self.now.weekday() + 7):
-            if self.schedule['subjects'][i % 7]:
+            if subjects[i % 7]:
                 break
         self.viewto = self.now.date() + datetime.timedelta(days=i - self.now.weekday())
 
@@ -1698,7 +1727,6 @@ class Scheduler:
             if hasattr(self, 'finish'):
                 self.finish.canvas.destroy()
 
-            subjects = self.schedule['subjects']
             packingfrom = subjects[self.viewfrom.weekday()]
             packingto = subjects[self.viewto.weekday()]
             packingfromset = set(packingfrom)
@@ -2124,7 +2152,8 @@ class Scheduler:
             fg = self.Colors['title1']
         menu = WindowManager.CreateWindow(master=master, title='Scheduler - Меню', bg=bg, attrs={'-alpha': 0})
 
-        self.Scheduler_data = eval(open('Scheduler_Data/data/Scheduler_data.dat', 'r', encoding='utf-8').read())
+        with open('Scheduler_Data/data/Scheduler_data.dat', 'r', encoding='utf-8') as f:
+            self.Scheduler_data = eval(f.read())
         self.NEW_DATA = dict()
         for i, j in self.Scheduler_data.items():
             self.NEW_DATA[i] = j
@@ -2256,7 +2285,11 @@ class Scheduler:
                 self.info.pack(pady=5)
 
                 if data_name in ('font', 'fontsize', 'theme'):
-                    self.load_schedule(root=selector)
+                    if hasattr(self, 'selectorwidgets'):
+                        for i in self.selectorwidgets.values():
+                            i.destroy()
+                    self.selectorwidgets = self.define_schedule(selector)
+                    self.load_schedule(root=selector, rootwidgets=self.selectorwidgets)
                     self.IN_SLEEP[0] = False
                     self.check_time(loop=False)
                     self.IN_SLEEP[0] = True
@@ -2327,84 +2360,11 @@ class Scheduler:
             except tk.TclError:
                 pass
 
-        """
-        def edit_data(file, data_name):
-            def write_new_data(i):
-                self.NEW_DATA['EDITOR_DATA'][i] = items[i].get().strip()
-
-            data = eval(open(f'Scheduler_Data/data/{file}.dat', 'r', encoding='utf-8').read())
-            self.Scheduler_data['EDITOR_DATA'] = dict()
-            self.NEW_DATA['EDITOR_DATA'] = dict()
-            for i, j in data.items():
-                self.Scheduler_data['EDITOR_DATA'][i] = j
-                self.NEW_DATA['EDITOR_DATA'][i] = j
-            self.EDITOR_FILE = file
-
-            editor = CreateWindow(master=menu, title=f'Scheduler - Редактирование данных - {data_name}', bg=bg)
-            editor.protocol('WM_DELETE_WINDOW', lambda: _quit(master=editor))
-            editor.bind('<Escape>', lambda event: _quit(master=editor))
-            editor.bind('<Return>', save)
-
-            container = tk.Frame(editor, bd=0, bg=bg)
-            canvas = tk.Canvas(container, height=700, highlightthickness=0, bg=bg)
-            scrollbar = tk.Scrollbar(container, orient='vertical', command=canvas.yview)
-            editorframe = tk.Frame(canvas, bg=bg, bd=0)
-            editor.bind('<MouseWheel>', lambda event: on_mousewheel(event, canvas))
-            editor.bind('<Up>', lambda event: canvas.yview_scroll(-2, 'units'))
-            editor.bind('<Down>', lambda event: canvas.yview_scroll(2, 'units'))
-
-            editorframe.bind(
-                '<Configure>',
-                lambda e: canvas.configure(
-                    scrollregion=canvas.bbox('all')
-                )
-            )
-
-            canvas.create_window((0, 0), window=editorframe, anchor='nw')
-            canvas.configure(yscrollcommand=scrollbar.set)
-            canvas.yview_moveto(0)
-
-            container.pack(fill='both', expand=True)
-            canvas.pack(side='left', fill='both', expand=True)
-            scrollbar.pack(side='right', fill='y')
-
-            items = dict()
-            for i, (j, k) in enumerate(data.items()):
-                value = tk.StringVar(editor, value=k)
-                items[j] = value
-                frame = tk.LabelFrame(editorframe, text=j, bg=bg, fg=fg, font=self.Fonts['bigger_normal_title'])
-                frame.grid(row=i, column=0, padx=5, pady=5, sticky='w')
-                entry = tk.Entry(frame, textvariable=value, bg=bg, fg=fg, font=self.Fonts['normal_title'], insertbackground=fg, width=50)
-                entry.bind('<KeyRelease>', lambda event, j=j: write_new_data(j))
-                entry.grid(padx=10, pady=10, sticky='w')
-
-            CreateButton(editor, text='Сохранить', bg=self.Colors['color1'], fg=fg,
-                         font=self.Fonts['bigger_normal_title'], bd=0, height=1,
-                         activebackground=self.Colors['color1a'], activeforeground=fg,
-                         enterforeground=fg, enterbackground=self.Colors['color1a'],
-                         command=save).pack(fill='x')
-
-            editor.update()
-            canvas['width'] = editorframe.winfo_width()
-
-            PlaceWindow(editor, menu)
-            menu.withdraw()
-            editor.focus_force()
-            editor.mainloop()
-
-            try:
-                editor.destroy()
-                menu.deiconify()
-                menu.focus_force()
-            except tk.TclError:
-                pass
-        """
-
         def save(event=None, restart=True):
             if 'EDITOR_DATA' in self.NEW_DATA:
                 if hasattr(self, 'EDITOR_FILE'):
-                    open(f'Scheduler_Data/data/{self.EDITOR_FILE}.dat', 'w', encoding='utf-8').write(
-                        str(self.NEW_DATA['EDITOR_DATA']))
+                    with open(f'Scheduler_Data/data/{self.EDITOR_FILE}.dat', 'w', encoding='utf-8') as f:
+                        f.write(str(self.NEW_DATA['EDITOR_DATA']))
                 del self.NEW_DATA['EDITOR_DATA']
                 del self.Scheduler_data['EDITOR_DATA']
             if self.Scheduler_data['font'] != self.NEW_DATA['font']:
@@ -2415,9 +2375,11 @@ class Scheduler:
                             f'Scheduler_Data/data/fontsize.dat')
             if self.Scheduler_data['theme'] != self.NEW_DATA['theme']:
                 shutil.copy(f'Scheduler_Data/Themes/{self.NEW_DATA["theme"]}.txt', f'Scheduler_Data/data/colors.dat')
-                self.Colors = eval(open('Scheduler_Data/data/colors.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/colors.dat', 'r', encoding='utf-8') as f:
+                    self.Colors = eval(f.read())
 
-                images_config = eval(open('Scheduler_Data/data/images_config.dat', 'r', encoding='utf-8').read())
+                with open('Scheduler_Data/data/images_config.dat', 'r', encoding='utf-8') as f:
+                    images_config = eval(f.read())
                 for i, j in images_config.items():
                     change_image_color(f'Scheduler_Data/images/{i}', hex_to_rgb(j))
 
@@ -2430,7 +2392,8 @@ class Scheduler:
 
             for i, j in self.NEW_DATA.items():
                 self.Scheduler_data[i] = j
-            open('Scheduler_Data/data/Scheduler_data.dat', 'w', encoding='utf-8').write(str(self.Scheduler_data))
+            with open('Scheduler_Data/data/Scheduler_data.dat', 'w', encoding='utf-8') as f:
+                f.write(str(self.Scheduler_data))
 
             for i in self.TO_DELETE_SCHEDULES:
                 os.remove(f'Scheduler_Data/Schedules/{i}.txt')
@@ -2483,27 +2446,38 @@ class Scheduler:
         warning_img = tk.PhotoImage(file='Scheduler_Data/images/warning.png', master=menu)
 
         container = tk.Frame(menu, bd=0, bg=bg)
-        canvas = tk.Canvas(container, highlightthickness=0, bg=bg)
-        scrollbar = ttk.Scrollbar(container, orient='vertical')
-        menuframe = tk.Frame(canvas, bg=bg, bd=0)
-
-        menuframe.bind(
-            '<Configure>',
-            lambda e: canvas.configure(
-                scrollregion=canvas.bbox('all')
-            )
-        )
-
-        canvas.create_window((0, 0), window=menuframe, anchor='nw')
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.yview_moveto(0)
-
+        notebook = ttk.Notebook(container, style='Custom.TNotebook')
+        notebook.pack(fill='both', expand=True, padx=5, pady=5)
         container.pack(fill='both', expand=True)
-        canvas.pack(side='left', fill='both', expand=True)
-        scrollbar.pack(side='right', fill='y')
 
         def create_menu_item(title='', description='', warning=False, type=None, **kwargs):
-            mainframe = tk.Frame(menuframe, bg=bg)
+            if type == 'separator':
+                text = kwargs.get('text', '')
+                if not text:
+                    return
+
+                # Создаём новую вкладку
+                tab_frame = tk.Frame(notebook, bg=bg)
+                notebook.add(tab_frame, text=text)
+                self.current_num += 1
+                menu.bind(f'{self.current_num}', lambda event: notebook.select(tab_frame))
+
+                # Сохраняем ссылку
+                self.current_tab = tab_frame
+
+                color = kwargs['color'] if 'color' in kwargs else fg
+                thickness = kwargs['thickness'] if 'thickness' in kwargs else 2
+                height = kwargs['height'] if 'height' in kwargs else 2
+                separator = tk.Frame(tab_frame, bg=bg, highlightbackground=color, highlightthickness=thickness,
+                                        height=height)
+                separator.pack(padx=20, pady=30, fill='both')
+                label = tk.Label(tab_frame, text=PlaceText(text, 800, self.Fonts['bigger_title']), bg=bg, fg=color,
+                                    font=self.Fonts['bigger_title'])
+                label.place(relx=0.5, y=30, anchor='center')
+
+                return tab_frame
+
+            mainframe = tk.Frame(self.current_tab, bg=bg)
             mainframe.pack(pady=8, fill='both', expand=True)
             leftframe = tk.Frame(mainframe, bg=bg)
             leftframe.pack(padx=20, side='left')
@@ -2541,34 +2515,19 @@ class Scheduler:
             height = mainframe.winfo_height()
 
             match type:
-                case 'separator':
-                    color = kwargs['color'] if 'color' in kwargs else fg
-                    thickness = kwargs['thickness'] if 'thickness' in kwargs else 2
-                    height = kwargs['height'] if 'height' in kwargs else 2
-                    text = kwargs['text'] if 'text' in kwargs else ''
-                    separator = tk.Frame(mainframe, bg=bg, highlightbackground=color, highlightthickness=thickness,
-                                         height=height)
-                    separator.pack(padx=20, pady=30, fill='both', expand=True)
-                    label = tk.Label(mainframe, text=PlaceText(text, 800, self.Fonts['bigger_title']), bg=bg, fg=color,
-                                     font=self.Fonts['bigger_title'])
-                    label.place(relx=0.5, rely=0.4, anchor='center')
-                    leftframe.destroy()
-                    rightframe.destroy()
-                    return mainframe
-
                 case 'button':
-                    text = kwargs['text'] if 'text' in kwargs else ''
-                    color = kwargs['color'] if 'color' in kwargs else fg
-                    font = kwargs['font'] if 'font' in kwargs else self.Fonts['big_title']
-                    command = kwargs['command'] if 'command' in kwargs else None
-                    event = kwargs['event'] if 'event' in kwargs else False
+                    text = kwargs.get('text', '')
+                    color = kwargs.get('color', fg)
+                    font = kwargs.get('font', self.Fonts['big_title'])
+                    command = kwargs.get('command')
+                    event = kwargs.get('event', False)
                     button = CreateButton(
                         rightframe, PlaceText(text, 340, font), command, event,
                         default_kwargs={'bg': bg, 'fg': fg, 'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': color},
                         target_kwargs={'bg': color, 'fg': bg, 'offset': 0, 'bd': 2, 'bdcolor': color},
-                        master_kwargs={'font': font, 'width': 350, 'height': height,
-                                       'text_align': 'center', 'padx': 0, 'pady': 0,
-                                       'place': {'method': 'pack', 'side': None, 'fill': 'both', 'expand': True}},
+                        master_kwargs={'font': font, 'width': 350, 'height': mainframe.winfo_reqheight(),
+                                    'text_align': 'center', 'padx': 0, 'pady': 0,
+                                    'place': {'method': 'pack', 'side': None, 'fill': 'both', 'expand': True}},
                         animation_kwargs=self.Values['animation_kwargs'],
                     )
                     return button
@@ -2587,21 +2546,19 @@ class Scheduler:
                                 checkbox.configure('in', master_kwargs={'image': checkbox_images[1]})
                             checkbox.state = not checkbox.state
 
-                    data_key = kwargs['data_key'] if 'data_key' in kwargs else None
-                    state = kwargs['state'] if 'state' in kwargs else None
-                    on_command = kwargs['on_command'] if 'on_command' in kwargs else None
-                    off_command = kwargs['off_command'] if 'off_command' in kwargs else None
-                    if data_key is None:
-                        image = checkbox_images[state]
-                    else:
-                        image = checkbox_images[self.NEW_DATA[data_key]]
-                    color = kwargs['color'] if 'color' in kwargs else self.Colors['main']
+                    data_key = kwargs.get('data_key')
+                    state = kwargs.get('state')
+                    on_command = kwargs.get('on_command')
+                    off_command = kwargs.get('off_command')
+                    image = checkbox_images[state if data_key is None else self.NEW_DATA[data_key]]
+
+                    color = kwargs.get('color', self.Colors['main'])
                     checkbox = CreateButton(
                         rightframe, None, on_click,
                         default_kwargs={'bg': bg, 'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': color},
                         target_kwargs={'bg': color, 'offset': 0, 'bd': 2, 'bdcolor': color},
                         master_kwargs={'image': image, 'padx': 0, 'pady': 0, 'ipadx': 0, 'ipady': 0,
-                                       'place': {'method': 'pack', 'side': None, 'fill': 'both', 'expand': True}},
+                                    'place': {'method': 'pack', 'side': None, 'fill': 'both', 'expand': True}},
                         animation_kwargs=self.Values['animation_kwargs'],
                     )
                     checkbox.state = state
@@ -2610,51 +2567,37 @@ class Scheduler:
                     return checkbox
 
                 case 'combobox':
-                    options = kwargs['options'] if 'options' in kwargs else []
-                    if isinstance(options, list | tuple):
+                    options = kwargs.get('options', [])
+                    if isinstance(options, (list, tuple)):
                         options = {i: i for i in options}
                     keys = tuple(options.keys())
                     values = tuple(options.values())
-                    data_key = kwargs['data_key'] if 'data_key' in kwargs else None
-                    data_type = kwargs['data_type'] if 'data_type' in kwargs else str
+                    data_key = kwargs.get('data_key')
+                    data_type = kwargs.get('data_type', str)
 
-                    combobox = ttk.Combobox(rightframe, values=keys, font=self.Fonts['big_title'],
-                                            state='readonly', width=22)
+                    combobox = ttk.Combobox(rightframe, values=keys, font=self.Fonts['big_title'], state='readonly', width=22)
                     combobox.get_value = lambda: data_type(combobox.get())
 
                     if data_key in self.Scheduler_data:
                         element = self.Scheduler_data[data_key]
-                        if element not in values:
-                            return
-                        index = values.index(element)
-                        combobox.set(keys[index])
+                        if element in values:
+                            index = values.index(element)
+                            combobox.set(keys[index])
 
                     if data_key:
                         def on_select(event=None):
                             value = combobox.get_value()
-                            if value not in options:
-                                return
-                            self.NEW_DATA[data_key] = options[value]
-                    else:
-                        def on_select(event=None):
-                            pass
-                    combobox.on_select = on_select
+                            if value in options:
+                                self.NEW_DATA[data_key] = options[value]
+                        combobox.on_select = on_select
+                        combobox.bind('<<ComboboxSelected>>', on_select)
 
-                    def on_mouse_wheel(event):
-                        def return_back_value():
-                            combobox.set(prev_value)
-                            on_select(event)
-
-                        prev_value = combobox.get_value()
-                        combobox.after(0, return_back_value)
-
-                    combobox.bind('<MouseWheel>', on_mouse_wheel)
-                    combobox.bind('<<ComboboxSelected>>', on_select)
                     combobox.pack(fill='both', expand=True)
                     return combobox
 
                 case _:
-                    raise ValueError(f'Invalid menu item type: {type}')
+                    if type is not None:
+                        raise ValueError(f'Invalid menu item type: {type}')
 
         def delete_schedule():
             schedule = ScheduleCombobox.get_value()
@@ -2676,6 +2619,9 @@ class Scheduler:
             ScheduleCombobox.set(to_set)
             ScheduleCombobox.on_select()
             self.TO_DELETE_SCHEDULES.append(schedule)
+
+        self.current_tab = None  # Активный фрейм-вкладка
+        self.current_num = 0
 
         create_menu_item(type='separator', text='Внешний вид')
         create_menu_item(title='Шрифт',
@@ -2742,6 +2688,15 @@ class Scheduler:
         create_menu_item(title='Округление времени в большую сторону',
                          description='Округлять время в большую сторону, а не в меньшую',
                          type='toggle', data_key='ceil_time')
+        create_menu_item(type='separator', text='Пакеты данных')
+        create_menu_item(title='Создание пакета данных',
+                         description='Создайте свой пакет данных для программы',
+                         type='button', text='Создать пакет', color=self.Colors['color5a'],
+                         command=lambda: self.create_data_package(menu))
+        create_menu_item(title='Просмотр и изменение пакетов данных',
+                         description='Посмотрите имеющиеся пакеты данных и при необходимости измените их',
+                         type='button', text='Посмотреть пакеты', color=self.Colors['color2a'],
+                         command=lambda: self.manage_data_packages(menu))
         create_menu_item(type='separator', text='Время')
         create_menu_item(title='Программное время',
                          description='Посмотрите текущее время, используемое в программе',
@@ -2783,15 +2738,7 @@ class Scheduler:
                          type='button', text='Выйти', color=self.Colors['color4a'],
                          command=_exit)
 
-        canvas.configure(width=menuframe.winfo_width(), height=min(menuframe.winfo_height(), 700))
-        menu.update_idletasks()
-
-        if menuframe.winfo_height() > canvas.winfo_height():
-            scrollbar.configure(command=canvas.yview)
-            menu.bind('<MouseWheel>', lambda event: WindowManager.on_mousewheel(event, canvas))
-            menu.bind('<Up>', lambda event: canvas.yview_scroll(-2, 'units'))
-            menu.bind('<Down>', lambda event: canvas.yview_scroll(2, 'units'))
-
+        menu.update()
         CreateButton(
             menu, 'Применить изменения', save,
             default_kwargs={'bg': self.Colors['color1'], 'fg': fg, 'r': 8, 'bd': 2, 'bdr': 10,
@@ -2996,24 +2943,9 @@ class Scheduler:
         win = WindowManager.CreateWindow(master=master, title=title, bg=bg)
 
         container = tk.Frame(win, bd=0, bg=bg)
-        canvas = tk.Canvas(container, bg=bg, width=910, height=600, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(container, orient='vertical')
-        frame = tk.Frame(canvas, bg=bg, bd=0)
-
-        frame.bind(
-            '<Configure>',
-            lambda e: canvas.configure(
-                scrollregion=canvas.bbox('all')
-            )
-        )
-
-        canvas.create_window((0, 0), window=frame, anchor='nw')
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.yview_moveto(0)
-
+        notebook = ttk.Notebook(container, style='Custom.TNotebook')
+        notebook.pack(fill='both', expand=True, padx=5, pady=5)
         container.pack(fill='both', expand=True)
-        canvas.pack(side='left', fill='both', expand=True)
-        scrollbar.pack(side='right', fill='y')
 
         add_img = tk.PhotoImage(file='Scheduler_Data/images/add.png')
         del_img = tk.PhotoImage(file='Scheduler_Data/images/delete.png')
@@ -3241,24 +3173,21 @@ class Scheduler:
                 nmbr.configure(text=str(n + self.weeks[i]['spinbox'].getnum()) + nmbr.mark)
 
             num = 0
-            while True:
-                if num not in self.sched[i].keys():
-                    break
+            while num in self.sched[i]:
                 num += 1
 
             bg = self.Colors['main']
-
             mainframe = tk.Frame(self.weeks[i]['weekframe'], bg=bg, bd=1, relief='raised')
             mainframe.grid(row=num + 1, column=0, padx=5, pady=5, sticky='nesw')
 
-            nmbr = tk.Label(mainframe, bg=bg, fg=fg, font=self.Fonts['big_title'], width=2, justify='left', anchor='w')
+            nmbr = tk.Label(mainframe, bg=bg, fg=fg, font=self.Fonts['big_title'], width=2, anchor='w')
             nmbr.mark = mark
             nmbr.setnum = setnum
             nmbr.grid(row=0, column=0, padx=5, pady=5, sticky='nesw')
 
             lesson = tk.StringVar(win, value=lesson_name)
             lessonentry = tk.Entry(mainframe, textvariable=lesson, bg=bg, fg=fg, insertbackground=fg,
-                                   font=self.Fonts['big_title'], width=24)
+                                font=self.Fonts['big_title'], width=24)
             lessonentry.bind('<Return>', lambda event, i=i, num=num: next_item(i, num, 'lesson'))
             lessonentry.bind('<FocusIn>', lambda event, entry=lessonentry, strvar=lesson: on_focus(entry, strvar))
             lessonentry.grid(row=0, column=1, padx=5, pady=5, sticky='nesw')
@@ -3268,7 +3197,7 @@ class Scheduler:
 
             stdur = tk.StringVar(win, value='00:00' if duration is None else duration.split('-')[0])
             stdurentry = tk.Entry(durframe, textvariable=stdur, bg=bg, fg=fg, insertbackground=fg,
-                                  font=self.Fonts['big_title'], width=5)
+                                font=self.Fonts['big_title'], width=5)
             stdurentry.bind('<Return>', lambda event, i=i, num=num: next_item(i, num, 'sttime'))
             stdurentry.bind('<FocusIn>', lambda event, entry=stdurentry, strvar=stdur: check_entry(entry, stdur))
             stdurentry.grid(row=0, column=0, padx=5, pady=5, sticky='nesw')
@@ -3278,7 +3207,7 @@ class Scheduler:
 
             nddur = tk.StringVar(win, value='00:00' if duration is None else duration.split('-')[1])
             nddurentry = tk.Entry(durframe, textvariable=nddur, bg=bg, fg=fg, insertbackground=fg,
-                                  font=self.Fonts['big_title'], width=5)
+                                font=self.Fonts['big_title'], width=5)
             nddurentry.bind('<Return>', lambda event, i=i, num=num: next_item(i, num, 'ndtime'))
             nddurentry.bind('<FocusIn>', lambda event, entry=nddurentry, strvar=nddur: check_entry(entry, nddur))
             nddurentry.grid(row=0, column=2, padx=5, pady=5, sticky='nesw')
@@ -3292,9 +3221,9 @@ class Scheduler:
                                 'bdcolor': self.Colors['main'], 'disabled_bg': self.Colors['main'],
                                 'disabled_bdcolor': self.Colors['shade2']},
                 target_kwargs={'bg': self.Colors['color2a'], 'disabled_bg': self.Colors['extra'], 'offset': 0, 'bd': 2,
-                               'bdcolor': self.Colors['color2a'], 'disabled_bdcolor': self.Colors['shade2']},
+                            'bdcolor': self.Colors['color2a'], 'disabled_bdcolor': self.Colors['shade2']},
                 master_kwargs={'image': up_img, 'height': height,
-                               'place': {'method': 'grid', 'row': 0, 'column': 3}},
+                            'place': {'method': 'grid', 'row': 0, 'column': 3}},
                 animation_kwargs=self.Values['animation_kwargs'],
             )
             up_button.color = self.Colors['color2a']
@@ -3305,9 +3234,9 @@ class Scheduler:
                                 'bdcolor': self.Colors['main'], 'disabled_bg': self.Colors['main'],
                                 'disabled_bdcolor': self.Colors['shade2']},
                 target_kwargs={'bg': self.Colors['color3a'], 'disabled_bg': self.Colors['extra'], 'offset': 0, 'bd': 2,
-                               'bdcolor': self.Colors['color3a'], 'disabled_bdcolor': self.Colors['shade2']},
+                            'bdcolor': self.Colors['color3a'], 'disabled_bdcolor': self.Colors['shade2']},
                 master_kwargs={'image': down_img, 'height': height, 'state': 'disabled',
-                               'place': {'method': 'grid', 'row': 0, 'column': 4}},
+                            'place': {'method': 'grid', 'row': 0, 'column': 4}},
                 animation_kwargs=self.Values['animation_kwargs'],
             )
             down_button.color = self.Colors['color3a']
@@ -3317,61 +3246,54 @@ class Scheduler:
                 default_kwargs={'bg': self.Colors['color1'], 'r': 8, 'bd': 2, 'bdr': 10,
                                 'bdcolor': self.Colors['main']},
                 target_kwargs={'bg': self.Colors['color1a'], 'disabled_bg': self.Colors['extra'], 'offset': 0, 'bd': 2,
-                               'bdcolor': self.Colors['color1a']},
-                master_kwargs={'image': mark_img, 'height': height, 'place': {'method': 'grid', 'row': 0, 'column': 5}},
+                            'bdcolor': self.Colors['color1a']},
+                master_kwargs={'image': mark_img, 'height': height,
+                            'place': {'method': 'grid', 'row': 0, 'column': 5}},
                 animation_kwargs=self.Values['animation_kwargs'],
             )
             mark_button.color = self.Colors['color1a']
 
             del_button = CreateButton(
                 mainframe, None, lambda event: delete_item(event, i, num), True,
-                default_kwargs={'bg': self.Colors['color4'],
-                                'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['main']},
-                target_kwargs={'bg': self.Colors['color4a'],
-                               'offset': 0, 'bd': 2, 'bdcolor': self.Colors['color4a']},
+                default_kwargs={'bg': self.Colors['color4'], 'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['main']},
+                target_kwargs={'bg': self.Colors['color4a'], 'offset': 0, 'bd': 2, 'bdcolor': self.Colors['color4a']},
                 master_kwargs={'image': del_img, 'height': height,
-                               'place': {'method': 'grid', 'row': 0, 'column': 6}},
+                            'place': {'method': 'grid', 'row': 0, 'column': 6}},
                 animation_kwargs=self.Values['animation_kwargs'],
             )
             del_button.color = self.Colors['color4a']
 
-            self.sched[i][num] = {'mainframe': mainframe, 'nmbr': nmbr, 'lesson': lesson, 'lessonentry': lessonentry,
-                                  'stdurentry': stdurentry, 'nddurentry': nddurentry, 'up_button': up_button,
-                                  'down_button': down_button, 'mark_button': mark_button, 'del_button': del_button,
-                                  'durframe': durframe, 'dash': dash, 'stdur': stdur, 'nddur': nddur}
+            self.sched[i][num] = {
+                'mainframe': mainframe, 'nmbr': nmbr, 'lesson': lesson, 'lessonentry': lessonentry,
+                'stdurentry': stdurentry, 'nddurentry': nddurentry, 'up_button': up_button,
+                'down_button': down_button, 'mark_button': mark_button, 'del_button': del_button,
+                'durframe': durframe, 'dash': dash, 'stdur': stdur, 'nddur': nddur
+            }
 
-            child = []
-            for j in self.sched[i][num].values():
-                if not hasattr(j, 'keys'):
-                    if hasattr(j, 'canvas'):
-                        j.FadeEffectInCommand = lambda obj=j, val=j.color: obj.configure('out', default_kwargs={
-                            'bdcolor': val})
-                        j.FadeEffectOutCommand = lambda obj=j: obj.configure('out', default_kwargs={
-                            'bdcolor': self.Colors['main']})
-                        child.append(j)
-                    continue
-                if 'bg' in j.keys():
-                    child.append(j)
-
+            child = [j for j in self.sched[i][num].values() if hasattr(j, 'canvas') or (hasattr(j, 'keys') and 'bg' in j.keys())]
             FadeEffect(mainframe, self.Colors['shade2'], child=child, **self.Values['animation_kwargs'])
 
-            for j, k in enumerate(self.sched[i].values()):
-                k['mainframe'].grid(row=j + 1, column=0, padx=5, pady=5, sticky='nesw')
-                k['nmbr'].setnum(j)
+            for idx, item in enumerate(self.sched[i].values()):
+                item['mainframe'].grid(row=idx + 1, column=0, padx=5, pady=5, sticky='nesw')
+                item['nmbr'].setnum(idx)
+
             sched_length = len(self.sched[i])
             self.weeks[i]['spinbox'].configure(to=min(10 - sched_length, 9))
+
             if sched_length == 1:
                 self.sched[i][num]['up_button'].configure('out', master_kwargs={'state': 'disabled'})
-
             else:
-                nextnum = self.sched[i][num]['nmbr'].num - 1
-                for j in self.sched[i].values():
-                    if j['nmbr'].num == nextnum:
-                        j['down_button'].configure('out', master_kwargs={'state': 'normal'})
+                prev_num = self.sched[i][num]['nmbr'].num - 1
+                for item in self.sched[i].values():
+                    if item['nmbr'].num == prev_num:
+                        item['down_button'].configure('out', master_kwargs={'state': 'normal'})
                         break
 
-            if sched_length + self.weeks[i]['spinbox'].getnum() == 10:
+            if sched_length + self.weeks[i]['spinbox'].getnum() >= 10:
                 self.weeks[i]['add_button'].configure('out', master_kwargs={'state': 'disabled'})
+            else:
+                self.weeks[i]['add_button'].configure('out', master_kwargs={'state': 'normal'})
+
             down_button.configure('out', master_kwargs={'state': 'disabled'})
             lessonentry.focus()
 
@@ -3401,8 +3323,11 @@ class Scheduler:
                 self.new_schedule = {'subjects': tuple(subjects), 'duration': tuple(duration),
                                      'startfrom': tuple(startfrom), 'mark': tuple(mark)}
 
-                edited = schedule is None or self.new_schedule != eval(
-                    open(f'Scheduler_Data/Schedules/{schedule}.txt', 'r', encoding='utf-8').read())
+                if schedule is None:
+                    edited = True
+                else:
+                    with open(f'Scheduler_Data/Schedules/{self.schedule_name}.txt', 'r', encoding='utf-8') as f:
+                        edited = self.new_schedule != eval(f.read())
                 if not save and edited:
                     answer = askyesnocancel('Выход', 'Совершённые изменения не были сохранены.',
                                             master=win,
@@ -3416,8 +3341,8 @@ class Scheduler:
                         win.quit()
                         return
                 if edited:
-                    open(f'Scheduler_Data/Schedules/{self.schedule_name}.txt', 'w', encoding='utf-8').write(
-                        str(self.new_schedule))
+                    with open(f'Scheduler_Data/Schedules/{self.schedule_name}.txt', 'w', encoding='utf-8') as f:
+                        f.write(str(self.new_schedule))
                     self.NEW_CHANGES = True
                 win.quit()
 
@@ -3433,51 +3358,51 @@ class Scheduler:
                 self.weeks[i]['add_button'].configure('out', master_kwargs={'state': 'normal'})
 
         for i, j in enumerate(self.WEEKNAMES):
-            weekframe = tk.LabelFrame(frame, bg=bg, fg=fg, text=j, font=self.Fonts['bigger_title'])
-            weekframe.grid(padx=5, pady=5, sticky='nesw')
+            tab_frame = tk.Frame(notebook, bg=bg)
+            notebook.add(tab_frame, text=j)
+            win.bind(f'{i + 1}', lambda event, tab=tab_frame: notebook.select(tab))
+
+            weekframe = tk.LabelFrame(tab_frame, bg=bg, fg=fg, text=j, font=self.Fonts['bigger_title'])
+            weekframe.pack(padx=5, pady=5, fill='both', expand=True)
+
             add_button = CreateButton(
                 weekframe, None, lambda i=i: create_item(i),
                 default_kwargs={'bg': self.Colors['main'], 'disabled_bg': self.Colors['extra'],
                                 'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['shade2'],
                                 'disabled_bdcolor': self.Colors['shade2']},
                 target_kwargs={'bg': self.Colors['shade2'], 'disabled_bg': self.Colors['extra'],
-                               'offset': 0, 'bd': 2,
-                               'bdcolor': self.Colors['shade2'], 'disabled_bdcolor': self.Colors['main']},
+                            'offset': 0, 'bd': 2, 'bdcolor': self.Colors['shade2'], 'disabled_bdcolor': self.Colors['main']},
                 master_kwargs={'width': 893, 'height': 42, 'image': add_img,
-                               'place': {'method': 'grid', 'row': 100, 'column': 0, 'sticky': 'nesw'}},
+                            'place': {'method': 'grid', 'row': 100, 'column': 0, 'sticky': 'nesw'}},
                 animation_kwargs=self.Values['animation_kwargs'],
             )
+
             startfrom_frame = tk.Frame(weekframe, bg=bg, bd=1, relief='raised')
             startfrom_frame.grid(row=0, column=0, padx=5, pady=5, sticky='nesw')
             tk.Label(startfrom_frame, text='Начинать нумерацию с:', bg=bg, fg=fg,
-                     font=self.Fonts['smaller_title']).grid(row=0, column=0, padx=5, pady=5, sticky='nesw')
+                    font=self.Fonts['smaller_title']).grid(row=0, column=0, padx=5, pady=5, sticky='nesw')
             var = tk.StringVar(win, value='1')
-            spinbox = tk.Spinbox(startfrom_frame, textvariable=var,
-                                 from_=0, to=9, width=2,
-                                 bg=self.Colors['title1'], fg=self.Colors['extra'], font=self.Fonts['smaller_title'],
-                                 justify='center', state='readonly')
+            spinbox = tk.Spinbox(startfrom_frame, textvariable=var, from_=0, to=9, width=2,
+                                bg=self.Colors['title1'], fg=self.Colors['extra'], font=self.Fonts['smaller_title'],
+                                justify='center', state='readonly')
             spinbox.getnum = lambda obj=spinbox: int(obj.get())
             spinbox.configure(command=lambda i=i: startfrom_select(i))
             spinbox.grid(row=0, column=1, padx=5, pady=5, sticky='nesw')
+
             self.weeks.append({'weekframe': weekframe, 'add_button': add_button, 'spinbox': spinbox, 'var': var})
             self.sched.append(dict())
 
         if schedule:
-            data = eval(open(f'Scheduler_Data/Schedules/{schedule}.txt', 'r', encoding='utf-8').read())
+            with open(f'Scheduler_Data/Schedules/{schedule}.txt', 'r', encoding='utf-8') as f:
+                data = eval(f.read())
             for i in range(len(data['subjects'])):
                 week = data['subjects'][i]
                 self.weeks[i]['var'].set(data['startfrom'][i])
                 for j in range(len(week)):
                     create_item(i, data['subjects'][i][j], data['duration'][i][j], data['mark'][i][j])
 
-        win.update_idletasks()
-        if frame.winfo_height() > canvas.winfo_height():
-            scrollbar.configure(command=canvas.yview)
-            win.bind('<MouseWheel>', lambda event: WindowManager.on_mousewheel(event, canvas))
-            win.bind('<Up>', lambda event: canvas.yview_scroll(-2, 'units'))
-            win.bind('<Down>', lambda event: canvas.yview_scroll(2, 'units'))
-
         text = 'Создать расписание' if schedule is None else 'Изменить расписание'
+        win.update()
         CreateButton(
             win, text, lambda: quit(save=True),
             default_kwargs={'bg': self.Colors['color1'], 'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['color1a']},
@@ -3504,11 +3429,734 @@ class Scheduler:
         master.focus_force()
         return -1
 
+    def create_data_package(self, master=None, edit_package=None):
+        """Создание пакета данных для распространения настроек программы."""
+        if master is None:
+            master = self.root
+
+        selected_indices = {'schedules': [], 'fonts': [], 'anims': []}
+        replace_flags = {}  # будут заполнены позже
+        theme_changed = False
+        sizes_changed = False
+        original_package_name = edit_package  # для удаления при переименовании
+
+        theme_data = self.Colors
+        theme_name = ''
+        with open('Scheduler_Data/data/fontsize.dat', 'r', encoding='utf-8') as f:
+            sizes_data = eval(f.read())
+        sizes_name = ''
+
+        # Если редактируем пакет, распаковываем его во временную папку и загружаем данные
+        temp_extract_dir = None
+        if edit_package:
+            pkg_path = f'datapacks/{edit_package}.scheduler-data'
+            if not os.path.exists(pkg_path):
+                showinfo("Ошибка", f"Пакет {edit_package} не найден.", master=master,
+                        fg=self.Colors['title1'], bg=self.Colors['main'],
+                        font=self.Fonts['text'], animation_kwargs=self.Values['animation_kwargs'])
+                return
+            # Распаковываем во временную папку
+            temp_extract_dir = f'Scheduler_Data/Temp/{edit_package}_edit'
+            if os.path.exists(temp_extract_dir):
+                shutil.rmtree(temp_extract_dir)
+            os.makedirs(temp_extract_dir)
+            with ZipFile(pkg_path, 'r') as zf:
+                zf.extractall(temp_extract_dir)
+
+            # Анализируем содержимое для предзаполнения интерфейса
+            # Расписания
+            srsched_files = [os.path.basename(i).removesuffix('.srsched') for i in glob(f'{temp_extract_dir}/*.srsched')]
+            ssched_files = [os.path.basename(i).removesuffix('.ssched') for i in glob(f'{temp_extract_dir}/*.ssched')] + srsched_files
+
+            # Тема
+            srtheme_files = glob(f'{temp_extract_dir}/*.srtheme')
+            stheme_files = glob(f'{temp_extract_dir}/*.stheme') + srtheme_files
+            if stheme_files:
+                with open(stheme_files[0], 'r', encoding='utf-8') as f:
+                    theme_data = eval(f.read())
+                theme_changed = True
+                # запомним имя темы
+                theme_name = os.path.basename(stheme_files[0]).split('.')[0]
+            
+            # Шрифты (папки)
+            srfont_files = []
+            sfont_files = []
+            fonts_dir = os.path.join(temp_extract_dir, 'Fonts')
+            if os.path.exists(fonts_dir):
+                for font_folder in os.listdir(fonts_dir):
+                    font_path = os.path.join(fonts_dir, font_folder)
+                    if os.path.isdir(font_path):
+                        sfont_files.append(font_folder)
+                        for font_file in os.listdir(font_path):
+                            if font_file.split('.')[-1] in ('srfont', 'srfontdata'):
+                                srfont_files.append(font_folder)
+                                break
+
+            # Размеры шрифтов
+            srfontsize_files = glob(f'{temp_extract_dir}/*.srfontsize')
+            sfontsize_files = glob(f'{temp_extract_dir}/*.sfontsize') + srfontsize_files
+            if sfontsize_files:
+                with open(sfontsize_files[0], 'r', encoding='utf-8') as f:
+                    sizes_data = eval(f.read())
+                sizes_changed = True
+                sizes_name = os.path.basename(sfontsize_files[0]).split('.')[0]
+
+            # Анимации
+            sranim_files = [os.path.basename(i).removesuffix('.sranimgif') for i in glob(f'{temp_extract_dir}/*.sranimgif')]
+            sanim_files = [os.path.basename(i).removesuffix('.sanimgif') for i in glob(f'{temp_extract_dir}/*.sanimgif')] + sranim_files
+
+            shutil.rmtree(temp_extract_dir)
+        else:
+            srsched_files = []
+            ssched_files = []
+            srtheme_files = []
+            stheme_files = []
+            srfont_files = []
+            sfont_files = []
+            srfontsize_files = []
+            sfontsize_files = []
+            sranim_files = []
+            sanim_files = []
+
+        def get_current_tab():
+            return notebook.nametowidget(notebook.select())
+
+        def on_tab_change(event):
+            win.after(50, lambda: restore_selection(get_current_tab()))
+
+        def save_current_selection(event=None):
+            current_tab = get_current_tab()
+            if current_tab == tab_schedules:
+                selected_indices['schedules'] = list(schedules_list.curselection())
+            elif current_tab == tab_fonts:
+                selected_indices['fonts'] = list(fonts_list.curselection())
+            elif current_tab == tab_anims:
+                selected_indices['anims'] = list(anims_list.curselection())
+
+        def restore_selection(tab):
+            if tab == tab_schedules:
+                schedules_list.selection_clear(0, 'end')
+                for idx in selected_indices['schedules']:
+                    schedules_list.selection_set(idx)
+            elif tab == tab_fonts:
+                fonts_list.selection_clear(0, 'end')
+                for idx in selected_indices['fonts']:
+                    fonts_list.selection_set(idx)
+            elif tab == tab_anims:
+                anims_list.selection_clear(0, 'end')
+                for idx in selected_indices['anims']:
+                    anims_list.selection_set(idx)
+
+        def _on_mousewheel(event):
+            current_tab = get_current_tab()
+            match_dict = {
+                tab_theme: theme_canvas,
+                tab_sizes: sizes_canvas
+            }
+            if current_tab not in match_dict:
+                return
+            canvas = match_dict[current_tab]
+            if event.delta:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            else:
+                # для Linux (Button-4/Button-5)
+                if event.num == 4:
+                    canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    canvas.yview_scroll(1, "units")
+
+        win = WindowManager.CreateWindow(
+            master, "Scheduler - Создание пакета данных",
+            bg=self.Colors['extra']
+        )
+
+        # ---------- Переменные для хранения состояния ----------
+        pkg_name = edit_package or ''
+        package_name_var = tk.StringVar(value=pkg_name)  # имя пакета (обязательное)
+
+        # Для темы
+        theme_name_var = tk.StringVar(value=theme_name)  # имя темы (если пустое → имя пакета)
+        sizes_name_var = tk.StringVar(value=sizes_name)  # имя размера шрифта (если пустое → имя пакета)
+
+        # Для размеров шрифтов
+        font_sizes = {}  # загрузим из файла
+        with open('Scheduler_Data/data/fontsize.dat', 'r', encoding='utf-8') as f:
+            font_sizes = eval(f.read())
+        edited_sizes = font_sizes.copy()  # копия для редактирования
+
+        # ---------- Поле ввода имени пакета (обязательное) ----------
+        name_frame = tk.Frame(win, bg=self.Colors['extra'])
+        name_frame.pack(fill='x', padx=10, pady=5)
+        tk.Label(name_frame, text="Имя пакета *", bg=self.Colors['extra'],
+                 fg=self.Colors['title1'], font=self.Fonts['small_title']).pack(side='left')
+        tk.Entry(name_frame, textvariable=package_name_var, bg=self.Colors['main'],
+                 fg=self.Colors['title1'], insertbackground=self.Colors['title1'],
+                 font=self.Fonts['text']).pack(side='left', fill='x', expand=True, padx=5)
+
+        # ---------- Notebook с вкладками ----------
+        notebook = ttk.Notebook(win)
+        notebook.pack(fill='both', expand=True, padx=5, pady=5)
+
+        # === Вкладка "Расписания" ===
+        tab_schedules = tk.Frame(notebook, bg=self.Colors['extra'])
+        notebook.add(tab_schedules, text="Расписания")
+
+        # список существующих расписаний
+        schedules_list = tk.Listbox(tab_schedules, selectmode='multiple',
+                                    bg=self.Colors['main'], fg=self.Colors['title1'],
+                                    font=self.Fonts['text'], height=8)
+        schedules_list.bind('<ButtonRelease-1>', save_current_selection)
+        schedules_list.pack(fill='both', expand=True, padx=5, pady=5)
+        # заполняем список
+        for i, f in enumerate(glob('Scheduler_Data/Schedules/*.txt')):
+            name = os.path.basename(f).removesuffix('.txt')
+            schedules_list.insert('end', name)
+            if name in ssched_files:
+                selected_indices['schedules'].append(i)
+
+        # флажок "заменять существующие"
+        replace_sched = tk.BooleanVar(value=bool(srsched_files))
+        tk.Checkbutton(tab_schedules, text="Заменять существующие расписания",
+                       variable=replace_sched, bg=self.Colors['extra'],
+                       fg=self.Colors['title1'], selectcolor=self.Colors['main']).pack(anchor='w', padx=5)
+        replace_flags['schedules'] = replace_sched
+
+        # === Вкладка "Тема" ===
+        tab_theme = tk.Frame(notebook, bg=self.Colors['extra'])
+        notebook.add(tab_theme, text="Тема")
+
+        # поле для имени темы
+        theme_name_frame = tk.Frame(tab_theme, bg=self.Colors['extra'])
+        theme_name_frame.pack(fill='x', padx=5, pady=5)
+        tk.Label(theme_name_frame, text="Имя темы:", bg=self.Colors['extra'],
+                 fg=self.Colors['title1'], font=self.Fonts['small_title']).pack(side='left')
+        tk.Entry(theme_name_frame, textvariable=theme_name_var, bg=self.Colors['main'],
+                 fg=self.Colors['title1'], insertbackground=self.Colors['title1'],
+                 font=self.Fonts['text']).pack(side='left', fill='x', expand=True, padx=5)
+
+        # фрейм для редактирования цветов (прокручиваемый внутри вкладки)
+        theme_canvas = tk.Canvas(tab_theme, bg=self.Colors['extra'], highlightthickness=0)
+        theme_scroll = ttk.Scrollbar(tab_theme, orient='vertical', command=theme_canvas.yview)
+        theme_inner = tk.Frame(theme_canvas, bg=self.Colors['extra'])
+
+        theme_inner.bind('<Configure>', lambda e: theme_canvas.configure(scrollregion=theme_canvas.bbox('all')))
+        theme_canvas.create_window((0, 0), window=theme_inner, anchor='nw')
+        theme_canvas.configure(yscrollcommand=theme_scroll.set)
+
+        theme_canvas.pack(side='left', fill='both', expand=True)
+        theme_scroll.pack(side='right', fill='y')
+
+        # словарь для хранения переменных цветов
+        color_vars = {}
+        # создаем строки для каждого цвета
+        row = 0
+        for key, value in theme_data.items():
+            frame = tk.Frame(theme_inner, bg=self.Colors['extra'])
+            frame.grid(row=row, column=0, sticky='ew', pady=2, padx=5)
+            tk.Label(frame, text=key, bg=self.Colors['extra'], fg=self.Colors['title1'],
+                     font=self.Fonts['text'], width=20, anchor='w').pack(side='left')
+
+            var = tk.StringVar(value=value)
+            color_vars[key] = var
+
+            # кнопка с цветом
+            def pick_color(b, v):
+                color = colorchooser.askcolor(initialcolor=v.get(), parent=win)
+                if color[1]:
+                    v.set(color[1])
+                    b.config(bg=color[1])
+                    nonlocal theme_changed
+                    theme_changed = True
+
+            btn = tk.Button(frame, bg=value, width=2)
+            btn.configure(command=lambda b=btn, k=key, v=var: pick_color(b, v))
+            btn.pack(side='left', padx=5)
+
+            # метка с hex-кодом
+            lbl = tk.Label(frame, textvariable=var, bg=self.Colors['extra'],
+                           fg=self.Colors['title1'], font=self.Fonts['text'])
+            lbl.pack(side='left', padx=5)
+            row += 1
+
+        # флажок "заменять существующую тему"
+        replace_theme = tk.BooleanVar(value=bool(srtheme_files))
+        tk.Checkbutton(tab_theme, text="Заменять существующую тему",
+                       variable=replace_theme, bg=self.Colors['extra'],
+                       fg=self.Colors['title1'], selectcolor=self.Colors['main']).pack(anchor='w', padx=5, pady=5)
+        replace_flags['theme'] = replace_theme
+
+        # === Вкладка "Шрифты" ===
+        tab_fonts = tk.Frame(notebook, bg=self.Colors['extra'])
+        notebook.add(tab_fonts, text="Шрифты")
+
+        fonts_list = tk.Listbox(tab_fonts, selectmode='multiple',
+                                bg=self.Colors['main'], fg=self.Colors['title1'],
+                                font=self.Fonts['text'], height=8)
+        fonts_list.bind('<ButtonRelease-1>', save_current_selection)
+        fonts_list.pack(fill='both', expand=True, padx=5, pady=5)
+        # список установленных шрифтов (папки в Fonts)
+        for i, f in enumerate(glob('Scheduler_Data/Fonts/*')):
+            if os.path.isdir(f):
+                name = os.path.basename(f)
+                fonts_list.insert('end', name)
+                if name in sfont_files:
+                    selected_indices['fonts'].append(i)
+
+        replace_font = tk.BooleanVar(value=bool(srfont_files))
+        tk.Checkbutton(tab_fonts, text="Заменять существующие шрифты",
+                       variable=replace_font, bg=self.Colors['extra'],
+                       fg=self.Colors['title1'], selectcolor=self.Colors['main']).pack(anchor='w', padx=5)
+        replace_flags['fonts'] = replace_font
+
+        # === Вкладка "Размеры шрифтов" ===
+        tab_sizes = tk.Frame(notebook, bg=self.Colors['extra'])
+        notebook.add(tab_sizes, text="Размеры шрифтов")
+
+        sizes_name_frame = tk.Frame(tab_sizes, bg=self.Colors['extra'])
+        sizes_name_frame.pack(fill='x', padx=5, pady=5)
+        tk.Label(sizes_name_frame, text="Имя размера шрифта:", bg=self.Colors['extra'],
+                 fg=self.Colors['title1'], font=self.Fonts['small_title']).pack(side='left')
+        tk.Entry(sizes_name_frame, textvariable=sizes_name_var, bg=self.Colors['main'],
+                 fg=self.Colors['title1'], insertbackground=self.Colors['title1'],
+                 font=self.Fonts['text']).pack(side='left', fill='x', expand=True, padx=5)
+
+        sizes_canvas = tk.Canvas(tab_sizes, bg=self.Colors['extra'], highlightthickness=0)
+        sizes_scroll = ttk.Scrollbar(tab_sizes, orient='vertical', command=sizes_canvas.yview)
+        sizes_inner = tk.Frame(sizes_canvas, bg=self.Colors['extra'])
+
+        sizes_inner.bind('<Configure>', lambda e: sizes_canvas.configure(scrollregion=sizes_canvas.bbox('all')))
+        sizes_canvas.create_window((0, 0), window=sizes_inner, anchor='nw')
+        sizes_canvas.configure(yscrollcommand=sizes_scroll.set)
+        sizes_canvas.yview_moveto(0)
+
+        sizes_canvas.pack(side='left', fill='both', expand=True)
+        sizes_scroll.pack(side='right', fill='y')
+
+        # Привязываем
+        win.bind("<MouseWheel>", lambda e: _on_mousewheel(e))
+        win.bind("<Button-4>", lambda e: _on_mousewheel(e))  # Linux
+        win.bind("<Button-5>", lambda e: _on_mousewheel(e))  # Linux
+
+        notebook.bind("<<NotebookTabChanged>>", on_tab_change)
+
+        size_vars = {}
+        row = 0
+        for key, value in sizes_data.items():
+            frame = tk.Frame(sizes_inner, bg=self.Colors['extra'])
+            frame.grid(row=row, column=0, sticky='ew', pady=2, padx=5)
+            tk.Label(frame, text=key, bg=self.Colors['extra'], fg=self.Colors['title1'],
+                     font=self.Fonts['text'], width=20, anchor='w').pack(side='left')
+
+            var = tk.IntVar(value=value)
+            size_vars[key] = var
+
+            spin = tk.Spinbox(frame, from_=6, to=100, textvariable=var,
+                              bg=self.Colors['main'], fg=self.Colors['title1'],
+                              font=self.Fonts['text'], width=5)
+            spin.pack(side='left', padx=5)
+            row += 1
+
+        replace_sizes = tk.BooleanVar(value=bool(srfontsize_files))
+        tk.Checkbutton(tab_sizes, text="Заменять существующие размеры",
+                       variable=replace_sizes, bg=self.Colors['extra'],
+                       fg=self.Colors['title1'], selectcolor=self.Colors['main']).pack(anchor='w', padx=5, pady=5)
+        replace_flags['sizes'] = replace_sizes
+
+        # === Вкладка "Анимации" ===
+        tab_anims = tk.Frame(notebook, bg=self.Colors['extra'])
+        notebook.add(tab_anims, text="Анимации")
+
+        anims_list = tk.Listbox(tab_anims, selectmode='multiple',
+                                bg=self.Colors['main'], fg=self.Colors['title1'],
+                                font=self.Fonts['text'], height=8)
+        anims_list.bind('<ButtonRelease-1>', save_current_selection)
+        anims_list.pack(fill='both', expand=True, padx=5, pady=5)
+        # список GIF-файлов
+        for i, f in enumerate(glob('Scheduler_Data/Animations/GIFs/*.gif')):
+            name = os.path.basename(f).removesuffix('.gif')
+            anims_list.insert('end', name)
+            if name in sanim_files:
+                selected_indices['anims'].append(i)
+
+        replace_anim = tk.BooleanVar(value=bool(sranim_files))
+        tk.Checkbutton(tab_anims, text="Заменять существующие анимации",
+                       variable=replace_anim, bg=self.Colors['extra'],
+                       fg=self.Colors['title1'], selectcolor=self.Colors['main']).pack(anchor='w', padx=5)
+        replace_flags['anims'] = replace_anim
+
+        # ---------- Кнопка "Сохранить" ----------
+        btn_frame = tk.Frame(win, bg=self.Colors['extra'])
+        btn_frame.pack(fill='x', padx=10, pady=10)
+
+        def save_package():
+            nonlocal theme_changed, sizes_changed
+            # Проверка имени пакета
+            pkg_name = sanitize_filename(package_name_var.get().strip())
+            if not pkg_name:
+                showinfo("Ошибка", "Имя пакета не может быть пустым.", master=win,
+                         fg=self.Colors['title1'], bg=self.Colors['main'],
+                         font=self.Fonts['text'], yes_deiconify=True,
+                         animation_kwargs=self.Values['animation_kwargs'])
+                return
+            delete_old = (edit_package and pkg_name != edit_package)
+
+            if os.path.exists(f'datapacks/{pkg_name}.scheduler-data'):
+                if not askyesno('Перезапись пакета',
+                                f'Пакет \'{pkg_name}\' уже существует. Вы хотите перезаписать пакет?\n'
+                                'Перезапись имеющегося пакета безвозвратно уничтожит его.', master=win,
+                                fg=self.Colors['title1'], bg=self.Colors['main'],
+                                font=self.Fonts['text'], yes_text='Перезаписать', yes_deiconify=True,
+                                animation_kwargs=self.Values['animation_kwargs']):
+                    return
+
+            # --- Расписания ---
+            selected_scheds = selected_indices['schedules']
+            if selected_scheds:
+                replace = replace_flags['schedules'].get()
+                ext = '.srsched' if replace else '.ssched'
+                for idx in selected_scheds:
+                    name = schedules_list.get(idx)
+                    src = f'Scheduler_Data/Schedules/{name}.txt'
+                    dst = f"Scheduler_Data/Temp/{name}{ext}"
+                    shutil.copy(src, dst)
+
+            # --- Тема ---
+            # Проверяем, были ли изменения цветов
+            if theme_changed:
+                theme_name = sanitize_filename(theme_name_var.get().strip())
+                if not theme_name:
+                    theme_name = pkg_name  # используем имя пакета
+                # собираем словарь цветов из переменных
+                theme_dict = {key: var.get() for key, var in color_vars.items()}
+                replace = replace_flags['theme'].get()
+                ext = '.srtheme' if replace else '.stheme'
+                theme_file = f"Scheduler_Data/Temp/{theme_name}{ext}"
+                with open(theme_file, 'w', encoding='utf-8') as f:
+                    f.write(str(theme_dict))
+
+            # --- Шрифты ---
+            selected_fonts = selected_indices['fonts']
+            if selected_fonts:
+                os.mkdir('Scheduler_Data/Temp/Fonts')
+                replace = replace_flags['fonts'].get()
+                for idx in selected_fonts:
+                    font_name = fonts_list.get(idx)
+                    font_dir = f'Scheduler_Data/Fonts/{font_name}'
+                    if not os.path.isdir(font_dir):
+                        continue
+                    os.mkdir(f'Scheduler_Data/Temp/Fonts/{font_name}')
+                    # .ttf файл
+                    ttf_files = glob(f'{font_dir}/*.ttf')
+                    for ttf in ttf_files:
+                        base = os.path.basename(ttf).removesuffix('.ttf')
+                        ext_ttf = '.srfont' if replace else '.sfont'
+                        dst_ttf = f"Scheduler_Data/Temp/Fonts/{font_name}/{base}{ext_ttf}"
+                        shutil.copy(ttf, dst_ttf)
+                    # .dat файл
+                    dat_file = f'{font_dir}/{font_name}.dat'
+                    if os.path.exists(dat_file):
+                        ext_dat = '.srfontdata' if replace else '.sfontdata'
+                        dst_dat = f"Scheduler_Data/Temp/Fonts/{font_name}/{font_name}{ext_dat}"
+                        shutil.copy(dat_file, dst_dat)
+                    # .txt файл
+                    txt_files = glob(f'{font_dir}/*.txt')
+                    for txt in txt_files:
+                        base = os.path.basename(txt).removesuffix('.txt')
+                        dst_txt = f"Scheduler_Data/Temp/Fonts/{font_name}/{base}.txt"
+                        shutil.copy(txt, dst_txt)
+
+            # --- Размеры шрифтов ---
+            # собираем словарь размеров из переменных
+            sizes_dict = {key: var.get() for key, var in size_vars.items()}
+            for key in edited_sizes.keys():
+                if edited_sizes[key] != sizes_dict[key]:
+                    sizes_changed = True
+                    break
+            if sizes_changed:
+                sizes_name = sanitize_filename(sizes_name_var.get().strip())
+                if not sizes_name:
+                    sizes_name = pkg_name  # используем имя пакета
+                replace = replace_flags['sizes'].get()
+                ext = '.srfontsize' if replace else '.sfontsize'
+                sizes_file = f"Scheduler_Data/Temp/{sizes_name}{ext}"
+                with open(sizes_file, 'w', encoding='utf-8') as f:
+                    f.write(str(sizes_dict))
+
+            # --- Анимации ---
+            selected_anims = selected_indices['anims']
+            if selected_anims:
+                replace = replace_flags['anims'].get()
+                ext = '.sranimgif' if replace else '.sanimgif'
+                for idx in selected_anims:
+                    anim_name = anims_list.get(idx)
+                    src = f'Scheduler_Data/Animations/GIFs/{anim_name}.gif'
+                    dst = f"Scheduler_Data/Temp/{anim_name}{ext}"
+                    shutil.copy(src, dst)
+
+            # --- Создание архива ---
+            archive_path = f"datapacks/{pkg_name}.scheduler-data"
+            with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for file in glob('Scheduler_Data/Temp/**', recursive=True):
+                    obj = file.removeprefix('Scheduler_Data/Temp/')
+                    if not obj or obj.startswith('Temp/') or (temp_extract_dir and obj.startswith(os.path.basename(temp_extract_dir))):
+                        continue
+                    zf.write(file, obj)
+
+            for file in glob('Scheduler_Data/Temp/*'):
+                if os.path.isdir(file) and file != temp_extract_dir:
+                    shutil.rmtree(file)
+                elif file != temp_extract_dir:
+                    os.remove(file)
+            if temp_extract_dir and os.path.exists(temp_extract_dir):
+                shutil.rmtree(temp_extract_dir)
+            
+            # Удаление старого пакета при необходимости
+            if delete_old:
+                old_path = f'datapacks/{edit_package}.scheduler-data'
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+
+            # Сообщаем об успехе
+            showinfo("Готово", f"Пакет данных сохранён как\n{archive_path}", master=win,
+                     fg=self.Colors['title1'], bg=self.Colors['main'],
+                     font=self.Fonts['text'], animation_kwargs=self.Values['animation_kwargs'])
+            on_close()
+
+        CreateButton(
+            btn_frame, "Сохранить пакет", save_package,
+            default_kwargs={'bg': self.Colors['color1'], 'fg': self.Colors['title1'],
+                            'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['color1a']},
+            target_kwargs={'bg': self.Colors['color1a'], 'offset': 0,
+                           'bd': 2, 'bdcolor': self.Colors['color1a']},
+            master_kwargs={'font': self.Fonts['bigger_title'], 'width': 200,
+                           'text_align': 'center', 'place': {'method': 'pack'}},
+            animation_kwargs=self.Values['animation_kwargs']
+        )
+
+        # --- Обработка закрытия окна ---
+        def on_close():
+            win.quit()
+            win.destroy()
+            master.deiconify()
+            master.focus_force()
+        
+        tabs = (tab_schedules, tab_theme, tab_fonts, tab_sizes, tab_anims)
+        for i, j in zip(range(1, 6), tabs):
+            win.bind(i, lambda event, tab=j: notebook.select(tab))
+
+        win.protocol('WM_DELETE_WINDOW', on_close)
+        win.bind('<Escape>', lambda e: on_close())
+
+        # --- Запуск окна ---
+        WindowManager.PlaceWindow(win, master)
+        win.focus_force()
+        win.mainloop()
+        win.destroy()
+    
+    def manage_data_packages(self, master=None):
+        """Просмотр и изменение существующих пакетов данных."""
+        if master is None:
+            master = self.root
+        
+        width = 800
+        height = 500
+        text_space = 600
+        target_measure = text_space - self.ELLIPSIS_MEASURE
+
+        def delete_package(path, label, win, frame):
+            if askyesno('Удаление', f'Вы уверены, что хотите удалить пакет данных \'{label}\'?\n\nЭто действие НЕОБРАТИМО!',
+                        master=win, font=self.Fonts['smaller_title'], fg=self.Colors['title1'],
+                        bg=self.Colors['main'], yes_deiconify=True,
+                        animation_kwargs=self.Values['animation_kwargs']):
+                if os.path.exists(path):
+                    os.remove(path)
+                    widgets.remove(path)
+                    if not widgets:
+                        no_packages()
+                    frame.destroy()
+                    check_scrollable()
+        
+        def edit_package(win, name):
+            self.create_data_package(win, name)
+            show_packages()
+        
+        def _on_mousewheel(event):
+            if event.delta:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            else:
+                # для Linux (Button-4/Button-5)
+                if event.num == 4:
+                    canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    canvas.yview_scroll(1, "units")
+        
+        def check_scrollable():
+            scrollable_frame.update_idletasks()
+            if scrollable_frame.winfo_height() > height:
+                scrollbar.configure(command=canvas.yview)
+                win.bind("<MouseWheel>", lambda e: _on_mousewheel(e))
+                win.bind("<Button-4>", lambda e: _on_mousewheel(e))  # Linux
+                win.bind("<Button-5>", lambda e: _on_mousewheel(e))  # Linux
+                return True
+            else:
+                scrollbar.configure(command=lambda *args: None)
+                win.bind("<MouseWheel>", lambda e: None)
+                win.bind("<Button-4>", lambda e: None)  # Linux
+                win.bind("<Button-5>", lambda e: None)  # Linux
+                return False
+        
+        def no_packages():
+            tk.Label(
+                scrollable_frame,
+                text="Нет доступных пакетов данных.",
+                bg=self.Colors['extra'],
+                fg=self.Colors['title1'],
+                font=self.Fonts['text']
+            ).pack(pady=20)
+        
+        def show_packages():
+            global widgets
+            packages = glob(f'{packages_dir}/*.scheduler-data')
+            widgets = packages.copy()
+            for obj in scrollable_frame.winfo_children():
+                obj.destroy()
+            if not packages:
+                no_packages()
+            else:
+                for pkg_path in packages:
+                    pkg_name = os.path.basename(pkg_path).removesuffix('.scheduler-data')
+                    pkg_label = pkg_name
+                    measure = self.SCHEDULE_FONT.measure(pkg_label)
+                    if measure > text_space:
+                        length = len(pkg_label)
+                        for _ in range(1, len(pkg_label)):
+                            middle = int(length / 2)
+                            pkg_label = pkg_label[:middle - 1] + pkg_label[middle:]
+                            length -= 1
+                            if self.SCHEDULE_FONT.measure(pkg_label) <= target_measure:
+                                pkg_label = pkg_label[:middle] + '...' + pkg_label[middle:]
+                                break
+
+                    # Фрейм для одного пакета
+                    pkg_frame = tk.Frame(scrollable_frame, bg=self.Colors['extra'], highlightthickness=1, highlightbackground=self.Colors['main'])
+                    pkg_frame.pack(fill='both', padx=5, pady=5)
+
+                    # Название пакета
+                    tk.Label(
+                        pkg_frame,
+                        text=pkg_label,
+                        bg=self.Colors['extra'],
+                        fg=self.Colors['title1'],
+                        font=self.Fonts['big_title']
+                    ).pack(side='left', padx=10, pady=5)
+
+                    pkg_frame.update_idletasks()
+                    btn_height = pkg_frame.winfo_height()
+
+                    # Кнопка "Удалить"
+                    edit_btn = CreateButton(
+                        pkg_frame, None, lambda path=pkg_path, label=pkg_label, frame=pkg_frame: delete_package(path, label, win, frame),
+                        default_kwargs={'bg': self.Colors['color4'], 'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['color4a']},
+                        target_kwargs={'bg': self.Colors['color4a'], 'offset': 0, 'bd': 2, 'bdcolor': self.Colors['color4a']},
+                        master_kwargs={'image': self.images['delete'], 'height': btn_height, 'padx': 5,  'place': {'method': 'pack', 'side': 'right'}}
+                    )
+                    edit_btn.canvas.pack(side='right', padx=5)
+
+                    # Кнопка "Изменить"
+                    edit_btn = CreateButton(
+                        pkg_frame, None, lambda name=pkg_name: edit_package(win, name),
+                        default_kwargs={'bg': self.Colors['color2'], 'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['color2a']},
+                        target_kwargs={'bg': self.Colors['color2a'], 'offset': 0, 'bd': 2, 'bdcolor': self.Colors['color2a']},
+                        master_kwargs={'image': self.images['edit'], 'height': btn_height, 'padx': 5,  'place': {'method': 'pack', 'side': 'right'}}
+                    )
+                    edit_btn.canvas.pack(side='right', padx=5)
+
+                    # Кнопка "Установить"
+                    install_btn = CreateButton(
+                        pkg_frame, None, lambda path=pkg_path: install_datapacks(
+                            [path], {'master': win, 'fg': self.Colors['title1'], 'bg': self.Colors['main'], 'yes_deiconify': True, 'animation_kwargs': self.Values['animation_kwargs']}
+                        ),
+                        default_kwargs={'bg': self.Colors['color1'], 'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['color1a']},
+                        target_kwargs={'bg': self.Colors['color1a'], 'offset': 0, 'bd': 2, 'bdcolor': self.Colors['color1a']},
+                        master_kwargs={'image': self.images['install'], 'height': btn_height, 'padx': 5, 'place': {'method': 'pack', 'side': 'right'}}
+                    )
+                    install_btn.canvas.pack(side='right', padx=5)
+
+        win = WindowManager.CreateWindow(
+            master,
+            "Scheduler - Управление пакетами данных",
+            bg=self.Colors['extra']
+        )
+
+        # Заголовок
+        tk.Label(
+            win,
+            text="Доступные пакеты данных",
+            bg=self.Colors['extra'],
+            fg=self.Colors['title1'],
+            font=self.Fonts['larger_title']
+        ).pack(pady=10)
+
+        # Фрейм для списка с прокруткой
+        container = tk.Frame(win, bg=self.Colors['extra'])
+        container.pack(fill='both', expand=True)
+
+        canvas = tk.Canvas(container, width=width, height=height, bg=self.Colors['extra'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(container, orient='vertical')
+        scrollable_frame = tk.Frame(canvas, bg=self.Colors['extra'])
+
+        scrollable_frame.bind(
+            '<Configure>',
+            lambda e: canvas.configure(scrollregion=canvas.bbox('all'))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor='nw', width=width)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side='left', fill='both', expand=True)
+        scrollbar.pack(side='right', fill='y')
+
+        # Сканируем папку datapacks
+        packages_dir = 'datapacks'
+        if not os.path.exists(packages_dir):
+            os.makedirs(packages_dir)
+
+        show_packages()
+
+        win.update()
+        # Кнопка закрытия
+        CreateButton(
+            win, "Закрыть",
+            lambda: on_close(),
+            default_kwargs={'bg': self.Colors['color5'], 'fg': self.Colors['title1'],
+                            'r': 8, 'bd': 2, 'bdr': 10, 'bdcolor': self.Colors['color5a']},
+            target_kwargs={'bg': self.Colors['color5a'], 'offset': 0,
+                        'bd': 2, 'bdcolor': self.Colors['color5a']},
+            master_kwargs={'font': self.Fonts['bigger_title'], 'width': win.winfo_width(),
+                        'text_align': 'center', 'pady': 5,
+                        'place': {'method': 'pack', 'side': 'bottom', 'fill': 'x'}}
+        )
+
+        def on_close():
+            win.quit()
+            win.destroy()
+            master.deiconify()
+            master.focus_force()
+
+        win.protocol('WM_DELETE_WINDOW', on_close)
+        win.bind('<Escape>', lambda e: on_close())
+        check_scrollable()
+
+        master.withdraw()
+        WindowManager.PlaceWindow(win, master)
+        win.focus_force()
+        win.mainloop()
+
     def about(self, master):
         def _quit(event=None):
+            aboutwin.quit()
             aboutwin.destroy()
             master.deiconify()
-            WindowManager.OnTopWindow(master)
 
         aboutwin = WindowManager.CreateWindow(master, 'О программе Scheduler', bg=self.Colors['main'])
         aboutwin.protocol('WM_DELETE_WINDOW', _quit)
@@ -3523,12 +4171,13 @@ class Scheduler:
             animation_kwargs=self.Values['animation_kwargs'],
         )
 
-        tk.Label(aboutwin, text=f'Scheduler {__version__}', bg=self.Colors['main'], fg=self.Colors['title1'],
+        tk.Label(aboutwin, text=f'Scheduler {VERSION}', bg=self.Colors['main'], fg=self.Colors['title1'],
                  font=self.Fonts['huge_title']).grid(row=0, column=1, padx=10, pady=5)
-        tk.Label(aboutwin, text='Copyright © 2025-2026 Малухин Мирон. Все права защищены.', bg=self.Colors['main'],
+        tk.Label(aboutwin, text=COPYRIGHT, bg=self.Colors['main'],
                  fg=self.Colors['title1'], font=self.Fonts['text']).grid(row=1, column=1, padx=10, pady=5)
 
         WindowManager.PlaceWindow(aboutwin, master)
+        aboutwin.focus_force()
         aboutwin.mainloop()
 
     def set_view(self, view):
@@ -4822,52 +5471,6 @@ def glob(*args, **kwargs):
     return [i.replace('\\', '/') for i in shitty_glob(*args, **kwargs)]
 
 
-"""
-def CreateButton(master=None, text=None, image=None, command=None, row=None, column=None, animation_kwargs=None, **options) -> tk.Button:
-    animation_kwargs = animation_kwargs or {}
-    options = options['options'] if 'options' in options else options
-    if 'enterbackground' in options:
-        raise ValueError('enterbackground is deprecated. Use activebackground instead.')
-    if 'enterforeground' in options:
-        raise ValueError('enterforeground is deprecated. Use activeforeground instead.')
-
-    font = options['font'] if 'font' in options else 'helvetica 14'
-    foreground = options['fg'] if 'fg' in options else 'white'
-    background = options['bg'] if 'bg' in options else 'black'
-    activeforeground = options['activeforeground'] if 'activeforeground' in options else background
-    activebackground = options['activebackground'] if 'activebackground' in options else foreground
-    borderwidth = options['bd'] if 'bd' in options else 2
-    width = options['width'] if 'width' in options else None
-    height = options['height'] if 'height' in options else None
-    relief = options['relief'] if 'relief' in options else None
-    command = None if 'state' in options and options['state'] == 'disabled' else command
-
-    button = tk.Button(master, text=text, command=command, font=font, image=image,
-                       fg=foreground, bg=background, activeforeground=activeforeground,
-                       activebackground=activebackground, bd=borderwidth, width=width, height=height,
-                       relief=relief, disabledforeground=foreground)
-
-    highlight = options['highlight'] if 'highlight' in options else True
-    if highlight:
-        startfade = options['startfade'] if 'startfade' in options else False
-        FadeEffect(button, activebackground, activeforeground, startfade=startfade, **animation_kwargs)
-
-    if 'bind' in options:
-        for bind, command in options['bind'].items():
-            button.bind(bind, command)
-
-    rowspan = options['rowspan'] if 'rowspan' in options else 1
-    columnspan = options['columnspan'] if 'columnspan' in options else 1
-    padx = options['padx'] if 'padx' in options else 5
-    pady = options['pady'] if 'pady' in options else 5
-    sticky = options['sticky'] if'sticky' in options else 'nesw'
-
-    if None not in (row, column):
-        button.grid(row=row, column=column, rowspan=rowspan, columnspan=columnspan, padx=padx, pady=pady, sticky=sticky)
-    return button
-"""
-
-
 def CreateButton(parent, text=None, command=None, event=False,
                  default_kwargs=None, target_kwargs=None, master_kwargs=None, animation_kwargs=None):
     if command is None:
@@ -5236,10 +5839,197 @@ def askyesnocancel(title=None, prompt=None, master=None, rootWin=None, destroyWi
                      font=font, animation_kwargs=animation_kwargs, options=options)
 
 
+def install_datapacks(objects, kwargs=None):
+    def create(folder, obj, filename, ext='.txt'):
+        target = f'{folder}/{filename}{ext}'
+        if os.path.exists(target):
+            errors.append(('Файл уже существует', target))
+        else:
+            try:
+                shutil.copy(obj, target)
+                successes.append(('Файл создан', target))
+            except Exception as e:
+                errors.append((f'Ошибка при создании файла: {e}', target))
+
+    def replace(folder, obj, filename, ext='.txt'):
+        target = f'{folder}/{filename}{ext}'
+        if os.path.exists(target):
+            try:
+                os.remove(target)
+            except Exception as e:
+                errors.append((f'Ошибка при замене файла: {e}', target))
+                return
+            replaced = True
+        else:
+            replaced = False
+        try:
+            shutil.copy(obj, target)
+        except Exception as e:
+            errors.append((f'Ошибка при замене файла: {e}', target))
+            return
+        if replaced:
+            successes.append(('Файл заменён', target))
+        else:
+            successes.append(('Файл создан', target))
+
+    errors = []
+    successes = []
+
+    for obj in objects:
+        if not os.path.exists(obj):
+            continue
+        basename = os.path.basename(obj)
+        filename, ext = os.path.splitext(basename)
+
+        match ext:
+            case '.scheduler-data':
+                if os.path.exists(f'Scheduler_Data/Temp/{filename}.zip'):
+                    os.remove(f'Scheduler_Data/Temp/{filename}.zip')
+                shutil.copy(obj, f'Scheduler_Data/Temp/{filename}.zip')
+                if os.path.exists(f'Scheduler_Data/Temp/{filename}'):
+                    shutil.rmtree(f'Scheduler_Data/Temp/{filename}')
+                try:
+                    with ZipFile(f'Scheduler_Data/Temp/{filename}.zip', 'r', metadata_encoding='utf-8') as zip_file:
+                        zip_file.extractall(f'Scheduler_Data/Temp/{filename}')
+                except BadZipFile:
+                    errors.append(('Файл установки компонентов Scheduler повреждён', obj))
+                    continue
+
+                for file in glob(f'Scheduler_Data/Temp/{filename}/*'):
+                    subbasename = os.path.basename(file)
+                    subfilename, subext = os.path.splitext(subbasename)
+
+                    match subext:
+                        case '.srsched':
+                            replace('Scheduler_Data/Schedules', file, subfilename)
+                        case '.ssched':
+                            create('Scheduler_Data/Schedules', file, subfilename)
+
+                        case '.srtheme':
+                            replace('Scheduler_Data/Themes', file, subfilename)
+                        case '.stheme':
+                            create('Scheduler_Data/Themes', file, subfilename)
+
+                        case '.srfontdata':
+                            if not os.path.exists(f'Scheduler_Data/Fonts/{subfilename}'):
+                                os.mkdir(f'Scheduler_Data/Fonts/{subfilename}')
+                            with open('requirements.ini', 'r', encoding='utf-8') as f:
+                                data = eval(f.read())
+                            if f'Scheduler_Data/Fonts/{subfilename}' not in data['main']:
+                                data['main'][f'Scheduler_Data/Fonts/{subfilename}'] = []
+                                with open('requirements.ini', 'w', encoding='utf-8') as f:
+                                    f.write(str(data))
+                            replace(f'Scheduler_Data/Fonts/{subfilename}', file, subfilename, '.dat')
+                        case '.sfontdata':
+                            if not os.path.exists(f'Scheduler_Data/Fonts/{subfilename}'):
+                                os.mkdir(f'Scheduler_Data/Fonts/{subfilename}')
+                            with open('requirements.ini', 'r', encoding='utf-8') as f:
+                                data = eval(f.read())
+                            if f'Scheduler_Data/Fonts/{subfilename}' not in data['main']:
+                                data['main'][f'Scheduler_Data/Fonts/{subfilename}'] = []
+                                with open('requirements.ini', 'w', encoding='utf-8') as f:
+                                    f.write(str(data))
+                            create(f'Scheduler_Data/Fonts/{subfilename}', file, subfilename, '.dat')
+
+                        case '.srfont':
+                            if not os.path.exists(f'Scheduler_Data/Fonts/{subfilename}'):
+                                os.mkdir(f'Scheduler_Data/Fonts/{subfilename}')
+                            replace(f'Scheduler_Data/Fonts/{subfilename}', file, subfilename, '.ttf')
+                        case '.sfont':
+                            if not os.path.exists(f'Scheduler_Data/Fonts/{subfilename}'):
+                                os.mkdir(f'Scheduler_Data/Fonts/{subfilename}')
+                            create(f'Scheduler_Data/Fonts/{subfilename}', file, subfilename, '.ttf')
+
+                        case '.srfontsize':
+                            replace('Scheduler_Data/FontSizes', file, subfilename)
+                        case '.sfontsize':
+                            create('Scheduler_Data/FontSizes', file, subfilename)
+
+                        case '.sranimgif':
+                            replace('Scheduler_Data/Animations/GIFs', file, subfilename, '.gif')
+                        case '.sanimgif':
+                            create('Scheduler_Data/Animations/GIFs', file, subfilename, '.gif')
+
+                        case '.sranimpreset':
+                            replace('Scheduler_Data/Animations/presets', file, subfilename)
+                        case '.sanimpreset':
+                            create('Scheduler_Data/Animations/presets', file, subfilename)
+
+                        case '':
+                            match subbasename:
+                                case 'Fonts':
+                                    for i in glob(f'Scheduler_Data/Temp/{filename}/Fonts/*'):
+                                        if not os.path.isdir(i):
+                                            bn = os.path.basename(i)
+                                            errors.append(('Посторонний файл', f'{bn} внутри {obj}/Fonts/'))
+                                            continue
+                                        fontbasename = os.path.basename(i)
+                                        fontpath = f'Scheduler_Data/Fonts/{fontbasename}'
+                                        if not os.path.exists(fontpath):
+                                            os.mkdir(fontpath)
+                                        for j in glob(f'{i}/*'):
+                                            fontfilename, fontext = os.path.splitext(j)
+                                            fontfilebasename = os.path.basename(fontfilename)
+                                            match fontext:
+                                                case '.srfontdata':
+                                                    with open('requirements.ini', 'r', encoding='utf-8') as f:
+                                                        data = eval(f.read())
+                                                    if fontpath not in data['main']:
+                                                        data['main'][fontpath] = []
+                                                        with open('requirements.ini', 'w', encoding='utf-8') as f:
+                                                            f.write(str(data))
+                                                    replace(fontpath, j, fontfilebasename, '.dat')
+                                                case '.sfontdata':
+                                                    with open('requirements.ini', 'r', encoding='utf-8') as f:
+                                                        data = eval(f.read())
+                                                    if fontpath not in data['main']:
+                                                        data['main'][fontpath] = []
+                                                        with open('requirements.ini', 'w', encoding='utf-8') as f:
+                                                            f.write(str(data))
+                                                    create(fontpath, j, fontfilebasename, '.dat')
+
+                                                case '.srfont':
+                                                    replace(fontpath, j, fontfilebasename, '.ttf')
+                                                case '.sfont':
+                                                    create(fontpath, j, fontfilebasename, '.ttf')
+                                                
+                                                case '.txt':
+                                                    replace(fontpath, j, fontfilebasename)
+                                                
+                                                case _:
+                                                    errors.append(('Неподдерживаемый формат файла', f'{fontbasename} внутри {obj}/Fonts/'))
+                                case _:
+                                    errors.append(('Посторонний объект', f'{subbasename} внутри {obj}'))
+
+                        case _:
+                            errors.append(('Неподдерживаемый формат файла', f'{subbasename} внутри {obj}'))
+
+                os.remove(f'Scheduler_Data/Temp/{filename}.zip')
+                shutil.rmtree(f'Scheduler_Data/Temp/{filename}')
+
+            case _:
+                errors.append(('Неподдерживаемый формат файла', obj))
+
+    text = 'Обработка файлов завершена.\n'
+    if errors:
+        text += '\nОшибки:\n'
+        for error in errors:
+            text += f'{error[0]}: {error[1]}\n'
+    if successes:
+        text += '\nУспешно:\n'
+        for success in successes:
+            text += f'{success[0]}: {success[1]}\n'
+    if kwargs is None:
+        showinfo('Scheduler - Обработка файлов', text)
+    else:
+        showinfo('Scheduler - Обработка файлов', text, **kwargs)
+
+
 def mainloop():
     while True:
         scheduler = Scheduler()
         if scheduler.RESTART:
+            FontCache.clear_cache()  # Очистка кэша шрифтов модуля tkmd для корректной работы в новом сеансе
             continue
         break
 
@@ -5248,137 +6038,10 @@ def main():
     if len(set(sys.argv)) == 1:
         mainloop()
     else:
-        def create(folder, obj, filename, ext='.txt'):
-            target = f'{folder}/{filename}{ext}'
-            if os.path.exists(target):
-                errors.append(('Файл уже существует', target))
-            else:
-                try:
-                    shutil.copy(obj, target)
-                    successes.append(('Файл создан', target))
-                except Exception as e:
-                    errors.append((f'Ошибка при создании файла: {e}', target))
-
-        def replace(folder, obj, filename, ext='.txt'):
-            target = f'{folder}/{filename}{ext}'
-            if os.path.exists(target):
-                try:
-                    os.remove(target)
-                except Exception as e:
-                    errors.append((f'Ошибка при замене файла: {e}', target))
-                    return
-                replaced = True
-            else:
-                replaced = False
-            try:
-                shutil.copy(obj, target)
-            except Exception as e:
-                errors.append((f'Ошибка при замене файла: {e}', target))
-                return
-            if replaced:
-                successes.append(('Файл заменён', target))
-            else:
-                successes.append(('Файл создан', target))
-
         objects = sys.argv[1:]
-        errors = []
-        successes = []
-
-        for obj in objects:
-            if not os.path.exists(obj):
-                continue
-            basename = os.path.basename(obj)
-            filename, ext = os.path.splitext(basename)
-
-            match ext:
-                case '.scheduler-data':
-                    if os.path.exists(f'Scheduler_Data/Temp/{filename}.zip'):
-                        os.remove(f'Scheduler_Data/Temp/{filename}.zip')
-                    shutil.copy(obj, f'Scheduler_Data/Temp/{filename}.zip')
-                    if os.path.exists(f'Scheduler_Data/Temp/{filename}'):
-                        shutil.rmtree(f'Scheduler_Data/Temp/{filename}')
-                    try:
-                        with ZipFile(f'Scheduler_Data/Temp/{filename}.zip', 'r', metadata_encoding='utf-8') as zip_file:
-                            zip_file.extractall(f'Scheduler_Data/Temp/{filename}')
-                    except BadZipFile:
-                        errors.append(('Файл установки компонентнов Scheduler повреждён', obj))
-                        continue
-
-                    for file in glob(f'Scheduler_Data/Temp/{filename}/*'):
-                        subbasename = os.path.basename(file)
-                        subfilename, subext = os.path.splitext(subbasename)
-
-                        match subext:
-                            case '.srsched':
-                                replace('Scheduler_Data/Schedules', file, subfilename)
-                            case '.ssched':
-                                create('Scheduler_Data/Schedules', file, subfilename)
-
-                            case '.srtheme':
-                                replace('Scheduler_Data/Themes', file, subfilename)
-                            case '.stheme':
-                                create('Scheduler_Data/Themes', file, subfilename)
-
-                            case '.srfontdata':
-                                if not os.path.exists(f'Scheduler_Data/Fonts/{subfilename}'):
-                                    os.mkdir(f'Scheduler_Data/Fonts/{subfilename}')
-                                data = eval(open('requirements.ini', 'r', encoding='utf-8').read())
-                                if f'Scheduler_Data/Fonts/{subfilename}' not in data['main']:
-                                    data['main'][f'Scheduler_Data/Fonts/{subfilename}'] = []
-                                    open('requirements.ini', 'w', encoding='utf-8').write(str(data))
-                                replace(f'Scheduler_Data/Fonts/{subfilename}', file, subfilename, '.dat')
-                            case '.sfontdata':
-                                if not os.path.exists(f'Scheduler_Data/Fonts/{subfilename}'):
-                                    os.mkdir(f'Scheduler_Data/Fonts/{subfilename}')
-                                data = eval(open('requirements.ini', 'r', encoding='utf-8').read())
-                                if f'Scheduler_Data/Fonts/{subfilename}' not in data['main']:
-                                    data['main'][f'Scheduler_Data/Fonts/{subfilename}'] = []
-                                    open('requirements.ini', 'w', encoding='utf-8').write(str(data))
-                                create(f'Scheduler_Data/Fonts/{subfilename}', file, subfilename, '.dat')
-
-                            case '.srfont':
-                                if not os.path.exists(f'Scheduler_Data/Fonts/{subfilename}'):
-                                    os.mkdir(f'Scheduler_Data/Fonts/{subfilename}')
-                                replace(f'Scheduler_Data/Fonts/{subfilename}', file, subfilename, '.ttf')
-                            case '.sfont':
-                                if not os.path.exists(f'Scheduler_Data/Fonts/{subfilename}'):
-                                    os.mkdir(f'Scheduler_Data/Fonts/{subfilename}')
-                                create(f'Scheduler_Data/Fonts/{subfilename}', file, subfilename, '.ttf')
-
-                            case '.srfontsize':
-                                replace('Scheduler_Data/FontSizes', file, subfilename)
-                            case '.sfontsize':
-                                create('Scheduler_Data/FontSizes', file, subfilename)
-
-                            case '.sranimgif':
-                                replace('Scheduler_Data/Animations/GIFs', file, subfilename, '.gif')
-                            case '.sanimgif':
-                                create('Scheduler_Data/Animations/GIFs', file, subfilename, '.gif')
-
-                            case '.sranimpreset':
-                                replace('Scheduler_Data/Animations/presets', file, subfilename)
-                            case '.sanimpreset':
-                                create('Scheduler_Data/Animations/presets', file, subfilename)
-
-                            case _:
-                                errors.append(('Неподдерживаемый формат файла', subbasename, 'внутри', obj))
-
-                    os.remove(f'Scheduler_Data/Temp/{filename}.zip')
-                    shutil.rmtree(f'Scheduler_Data/Temp/{filename}')
-
-                case _:
-                    errors.append(('Неподдерживаемый формат файла', obj))
-
-        text = 'Обработка файлов завершена.\n'
-        if errors:
-            text += '\nОшибки:\n'
-            for error in errors:
-                text += f'{error[0]}: {error[1]}\n'
-        if successes:
-            text += '\nУспешно:\n'
-            for success in successes:
-                text += f'{success[0]}: {success[1]}\n'
-        showinfo('Scheduler - Обработка файлов', text)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        os.chdir(script_dir)
+        install_datapacks(objects)
 
 
 if __name__ == '__main__':
